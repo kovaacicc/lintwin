@@ -96,7 +96,7 @@ def _do_git_sync(shared: SharedConfig, machine_name: str, remote_name: str) -> N
     if ahead == 0 and behind == 0:
         console.print("  Already up to date.")
     elif ahead > 0 and behind == 0:
-        git_core.stage_paths([], BARE_REPO)
+        git_core.stage_paths(shared.git_paths, BARE_REPO)
         msg = f"lintwin: sync from {machine_name} @ {now_iso()}"
         git_core.commit(msg, BARE_REPO)
         git_core.push("main", BARE_REPO)
