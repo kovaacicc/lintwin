@@ -1,4 +1,5 @@
 import click
+from pathlib import Path
 from rich.console import Console
 from lintwin.core.config import track_path, untrack_path
 from lintwin.core.constants import SHARED_CONFIG_PATH
@@ -13,6 +14,11 @@ err_console = Console(stderr=True)
               help="Sync method: git (text/configs) or rsync (large files)")
 def track_cmd(path: str, via: str) -> None:
     """Add PATH to the sync list."""
+    if via == "git":
+        expanded = Path(path).expanduser().resolve()
+        if not str(expanded).startswith(str(Path.home().resolve())):
+            err_console.print(f"[red]Error:[/red] Git-tracked paths must be inside $HOME. Use --via rsync for paths outside $HOME.")
+            raise SystemExit(1)
     track_path(path, via, SHARED_CONFIG_PATH)
     console.print(f"[green]Tracking[/green] {path} via {via}")
 

@@ -13,7 +13,14 @@ console = Console()
 @click.command("status")
 def status_cmd() -> None:
     """Show what has changed since the last sync."""
-    local = load_local_config()
+    try:
+        local = load_local_config()
+    except FileNotFoundError:
+        console.print("[red]Not initialized.[/red] Run `lintwin init` first.")
+        raise SystemExit(1)
+    if not git_core.is_initialized():
+        console.print("[red]Bare repo not found.[/red] Run `lintwin init` first.")
+        raise SystemExit(1)
     shared = load_shared_config()
     all_paths = shared.git_paths + shared.rsync_paths
 

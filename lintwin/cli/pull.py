@@ -14,7 +14,14 @@ console = Console()
 @click.option("--to", "remote_name", default=None, help="Target remote")
 def pull_cmd(remote_name: str | None) -> None:
     """Pull changes from remote without pushing."""
-    local = load_local_config()
+    try:
+        local = load_local_config()
+    except FileNotFoundError:
+        console.print("[red]Not initialized.[/red] Run `lintwin init` first.")
+        raise SystemExit(1)
+    if not git_core.is_initialized():
+        console.print("[red]Bare repo not found.[/red] Run `lintwin init` first.")
+        raise SystemExit(1)
     shared = load_shared_config()
     remote_name_resolved, remote = _select_remote(local, remote_name)
 

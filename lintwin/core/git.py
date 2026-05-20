@@ -51,8 +51,18 @@ def remote_head(branch: str = "main", bare_repo: Path = BARE_REPO) -> str:
     return _git("rev-parse", f"origin/{branch}", bare_repo=bare_repo).stdout.strip()
 
 
+def is_initialized(bare_repo: Path = BARE_REPO) -> bool:
+    return bare_repo.is_dir() and (bare_repo / "HEAD").exists()
+
+
 def divergence_info(branch: str = "main", bare_repo: Path = BARE_REPO) -> tuple[int, int]:
-    result = _git("rev-list", "--left-right", "--count", f"HEAD...origin/{branch}", bare_repo=bare_repo)
+    result = _git("rev-list", "--left-right", "--count", f"HEAD...origin/{branch}", bare_repo=bare_repo, check=False)
+    if result.returncode != 0:
+        # origin/main doesn't exist yet (before first push) — count local commits as ahead
+        head = _git("rev-list", "--count", "HEAD", bare_repo=bare_repo, check=False)
+        if head.returncode == 0:
+            return int(head.stdout.strip()), 0
+        return 0, 0
     parts = result.stdout.strip().split()
     return int(parts[0]), int(parts[1])
 

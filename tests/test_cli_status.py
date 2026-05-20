@@ -32,6 +32,7 @@ def test_diff_help() -> None:
 def test_status_shows_machine_name(monkeypatch) -> None:
     monkeypatch.setattr("lintwin.cli.status.load_local_config", lambda: MOCK_LOCAL)
     monkeypatch.setattr("lintwin.cli.status.load_shared_config", lambda: MOCK_SHARED)
+    monkeypatch.setattr("lintwin.cli.status.git_core.is_initialized", lambda: True)
     monkeypatch.setattr("lintwin.cli.status.git_status_short", lambda paths: [("M", "~/.bashrc")])
     monkeypatch.setattr("lintwin.cli.status.scan_for_dirty_repos", lambda paths: [])
     monkeypatch.setattr("lintwin.cli.status.check_connectivity", lambda r: False)

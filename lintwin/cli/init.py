@@ -66,7 +66,9 @@ def _create_github_repo(name: str) -> str:
 @click.command("init")
 @click.option("--join", "repo_url", default=None, metavar="REPO_URL",
               help="Join an existing lintwin setup from this git remote URL.")
-def init_cmd(repo_url: str | None) -> None:
+@click.option("--name", "machine_name", default=None, metavar="NAME",
+              help="Machine name (skips the interactive prompt).")
+def init_cmd(repo_url: str | None, machine_name: str | None) -> None:
     """Set up lintwin on this machine."""
     missing = check_prerequisites()
     if missing:
@@ -77,13 +79,14 @@ def init_cmd(repo_url: str | None) -> None:
     home = Path.home()
 
     if repo_url:
-        _run_join(repo_url, home)
+        _run_join(repo_url, home, machine_name)
     else:
-        _run_init(home)
+        _run_init(home, machine_name)
 
 
-def _run_init(home: Path) -> None:
-    machine_name = Prompt.ask("Name this machine", default="laptop")
+def _run_init(home: Path, machine_name: str | None = None) -> None:
+    if machine_name is None:
+        machine_name = Prompt.ask("Name this machine", default="laptop")
 
     console.print("\n[bold]Git remote[/bold]")
     create_new = Confirm.ask("Create a new private GitHub repo?", default=True)
@@ -118,8 +121,9 @@ def _run_init(home: Path) -> None:
     console.print(f"  lintwin init --join {repo_url}")
 
 
-def _run_join(repo_url: str, home: Path) -> None:
-    machine_name = Prompt.ask("Name this machine", default="desktop")
+def _run_join(repo_url: str, home: Path, machine_name: str | None = None) -> None:
+    if machine_name is None:
+        machine_name = Prompt.ask("Name this machine", default="desktop")
 
     git_core.init_bare_repo(BARE_REPO)
     git_core.set_remote(repo_url, BARE_REPO)

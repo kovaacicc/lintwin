@@ -16,6 +16,7 @@ MOCK_SHARED = SharedConfig(git_paths=["~/.bashrc"], rsync_paths=["~/Downloads"])
 def _patch_configs(monkeypatch):
     monkeypatch.setattr("lintwin.cli.sync.load_local_config", lambda: MOCK_LOCAL)
     monkeypatch.setattr("lintwin.cli.sync.load_shared_config", lambda: MOCK_SHARED)
+    monkeypatch.setattr("lintwin.cli.sync.git_core.is_initialized", lambda: True)
 
 
 def test_sync_help() -> None:
@@ -42,10 +43,11 @@ def test_sync_aborts_on_connectivity_failure(monkeypatch) -> None:
     monkeypatch.setattr("lintwin.cli.sync.scan_for_dirty_repos", lambda paths: [])
     monkeypatch.setattr("lintwin.cli.sync.git_status_short", lambda paths: [])
     monkeypatch.setattr("lintwin.cli.sync.check_connectivity", lambda r: False)
+    monkeypatch.setattr("lintwin.cli.sync._do_git_sync", lambda *a, **kw: None)
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["sync", "--to", "desktop"])
-    assert "Cannot reach" in result.output or result.exit_code != 0
+    result = runner.invoke(cli, ["sync", "--to", "desktop"], input="y\n")
+    assert "Cannot reach" in result.output
 
 
 def test_sync_shows_dirty_repos(monkeypatch) -> None:

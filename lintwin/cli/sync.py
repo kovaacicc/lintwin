@@ -48,8 +48,16 @@ def _show_git_preview(changes: list[tuple[str, str]]) -> None:
 @click.option("--dry-run", is_flag=True, help="Preview only, no changes applied")
 def sync_cmd(remote_name: str | None, dry_run: bool) -> None:
     """Sync this machine with a remote (git + rsync)."""
-    local = load_local_config()
+    try:
+        local = load_local_config()
+    except FileNotFoundError:
+        console.print("[red]Not initialized.[/red] Run `lintwin init` first.")
+        raise SystemExit(1)
+    if not git_core.is_initialized():
+        console.print("[red]Bare repo not found.[/red] Run `lintwin init` first.")
+        raise SystemExit(1)
     shared = load_shared_config()
+    remote_name_resolved, remote = _select_remote(local, remote_name)
     all_paths = shared.git_paths + shared.rsync_paths
 
     dirty = scan_for_dirty_repos(all_paths)
@@ -67,7 +75,6 @@ def sync_cmd(remote_name: str | None, dry_run: bool) -> None:
     git_changes = git_status_short(shared.git_paths)
     _show_git_preview(git_changes)
 
-    remote_name_resolved, remote = _select_remote(local, remote_name)
     reachable = check_connectivity(remote)
 
     if dry_run:

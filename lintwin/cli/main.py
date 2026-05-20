@@ -25,3 +25,7 @@ cli.add_command(status_cmd)
 cli.add_command(pull_cmd)
 cli.add_command(diff_cmd)
 cli.add_command(packages_cmd)
+
+
+if __name__ == "__main__":
+    cli()
