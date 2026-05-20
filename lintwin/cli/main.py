@@ -1,6 +1,7 @@
 import click
 from rich.console import Console
 from lintwin.cli.track import track_cmd, untrack_cmd
+from lintwin.cli.init import init_cmd
 
 console = Console()
 
@@ -13,3 +14,4 @@ def cli() -> None:
 
 cli.add_command(track_cmd)
 cli.add_command(untrack_cmd)
+cli.add_command(init_cmd)
