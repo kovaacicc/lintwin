@@ -31,7 +31,7 @@ pip install -e .
 To use `lintwin` without activating the venv each time, add an alias to your `.bashrc`:
 
 ```bash
-alias lintwin='/path/to/archsync/.venv/bin/lintwin'
+alias lintwin='/path/to/lintwin/.venv/bin/lintwin'
 ```
 
 ## Setup
@@ -63,6 +63,62 @@ lintwin init --join git@github.com:you/lintwin-dots.git --name work-laptop
 ```
 
 This pulls your existing tracked paths from the repo and walks you through entering each remote machine's IP/hostname.
+
+## Tailscale setup (optional, recommended)
+
+Without Tailscale, rsync only works when both machines are on the same LAN. With Tailscale, lintwin can sync over any network — from a coffee shop, from work, from anywhere — without port forwarding or VPN configuration.
+
+### Install and authenticate on each machine
+
+```bash
+sudo pacman -S tailscale
+sudo systemctl enable --now tailscaled
+sudo tailscale up
+```
+
+`tailscale up` opens a browser to log in with your Tailscale account. Do this on every machine you want to sync.
+
+### Find your machine names
+
+```bash
+tailscale status
+```
+
+This lists all your connected devices with their Tailscale hostnames (e.g. `desktop`, `laptop`) and IPs (e.g. `100.x.x.x`). Use these when lintwin asks for host/IP during `init`.
+
+### Configure lintwin to use Tailscale
+
+In `~/.config/lintwin/config.toml`, add `tailscale_hostname` to each remote:
+
+```toml
+[remotes.desktop]
+host = "192.168.1.10"          # LAN IP — used as fallback
+ssh_user = "karlo"
+tailscale_hostname = "desktop" # Tailscale hostname — tried first
+```
+
+When `tailscale_hostname` is set, lintwin checks Tailscale reachability first (`tailscale ping <hostname>`). If the machine is reachable over Tailscale, it uses `tailscale_hostname` as the SSH target. If not (Tailscale offline or peer not connected), it falls back to `host`.
+
+You can set `tailscale_hostname` without a LAN `host` if you only ever sync over Tailscale:
+
+```toml
+[remotes.desktop]
+host = "100.64.0.2"            # Tailscale IP — works as both
+ssh_user = "karlo"
+tailscale_hostname = "desktop"
+```
+
+### SSH over Tailscale
+
+Make sure your SSH key is authorized on the remote machine. Tailscale handles the network; SSH handles authentication. No extra config needed beyond what you'd do for LAN SSH:
+
+```bash
+ssh-copy-id karlo@desktop   # uses Tailscale hostname directly once tailscale is up
+```
+
+### Why not just use the Tailscale IP always?
+
+Tailscale IPs (`100.x.x.x`) work even on LAN, but they route through Tailscale's relay if direct connection fails — which adds latency for large rsync transfers. Using the LAN IP as `host` and Tailscale as `tailscale_hostname` gives you fast local transfers when at home and seamless remote sync otherwise.
 
 ## Daily use
 
