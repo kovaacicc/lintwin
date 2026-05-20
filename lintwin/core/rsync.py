@@ -32,10 +32,12 @@ def check_connectivity(remote: RemoteConfig) -> bool:
 
 
 def fetch_remote_snapshot(remote: RemoteConfig, remote_path: Path = SNAPSHOT_FILE) -> Snapshot | None:
-    result = subprocess.run(
-        ["ssh", f"{remote.ssh_user}@{remote.host}", f"cat {remote_path}"],
-        capture_output=True, text=True,
-    )
+    host = remote.tailscale_hostname or remote.host
+    ssh_cmd = ["ssh"]
+    if remote.ssh_port:
+        ssh_cmd += ["-p", str(remote.ssh_port)]
+    ssh_cmd += [f"{remote.ssh_user}@{host}", f"cat {remote_path}"]
+    result = subprocess.run(ssh_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         return None
     data = json.loads(result.stdout)
@@ -101,8 +103,11 @@ def rsync_path(
     excludes_file: str | None = None,
 ) -> subprocess.CompletedProcess:
     expanded = str(Path(local_path).expanduser())
-    remote_path = f"{remote.ssh_user}@{remote.host}:{expanded}/"
+    host = remote.tailscale_hostname or remote.host
+    remote_path = f"{remote.ssh_user}@{host}:{expanded}/"
     cmd = ["rsync", "-avz", "--delete"]
+    if remote.ssh_port:
+        cmd += ["-e", f"ssh -p {remote.ssh_port}"]
     if dry_run:
         cmd.append("--dry-run")
     if excludes_file:

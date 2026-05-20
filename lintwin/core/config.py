@@ -13,6 +13,7 @@ class RemoteConfig:
     host: str
     ssh_user: str
     tailscale_hostname: str | None = None
+    ssh_port: int | None = None
 
 
 @dataclass
@@ -36,6 +37,7 @@ def load_local_config(path: Path = LOCAL_CONFIG_PATH) -> LocalConfig:
             host=cfg["host"],
             ssh_user=cfg["ssh_user"],
             tailscale_hostname=cfg.get("tailscale_hostname"),
+            ssh_port=cfg.get("ssh_port"),
         )
         for name, cfg in data.get("remotes", {}).items()
     }
@@ -49,6 +51,8 @@ def save_local_config(config: LocalConfig, path: Path = LOCAL_CONFIG_PATH) -> No
         entry: dict = {"host": r.host, "ssh_user": r.ssh_user}
         if r.tailscale_hostname is not None:
             entry["tailscale_hostname"] = r.tailscale_hostname
+        if r.ssh_port is not None:
+            entry["ssh_port"] = r.ssh_port
         data["remotes"][name] = entry
     with open(path, "wb") as f:
         tomli_w.dump(data, f)

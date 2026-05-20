@@ -138,10 +138,12 @@ def _run_join(repo_url: str, home: Path, machine_name: str | None = None) -> Non
         host = Prompt.ask("Host / IP")
         ssh_user = Prompt.ask("SSH user")
         ts_host = Prompt.ask("Tailscale hostname (leave blank to skip)", default="")
+        port_str = Prompt.ask("SSH port (leave blank for default 22)", default="")
         remotes[name] = RemoteConfig(
             host=host,
             ssh_user=ssh_user,
             tailscale_hostname=ts_host if ts_host else None,
+            ssh_port=int(port_str) if port_str else None,
         )
 
     local = LocalConfig(machine_name=machine_name, remotes=remotes)

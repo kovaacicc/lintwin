@@ -21,8 +21,8 @@ Two sync strategies:
 On Arch Linux, avoid installing into the system Python. Use a virtualenv:
 
 ```bash
-git clone https://github.com/you/archsync
-cd archsync
+git clone https://github.com/kovaacicc/lintwin
+cd lintwin
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -93,7 +93,7 @@ In `~/.config/lintwin/config.toml`, add `tailscale_hostname` to each remote:
 ```toml
 [remotes.desktop]
 host = "192.168.1.10"          # LAN IP — used as fallback
-ssh_user = "karlo"
+ssh_user = "user"
 tailscale_hostname = "desktop" # Tailscale hostname — tried first
 ```
 
@@ -104,7 +104,7 @@ You can set `tailscale_hostname` without a LAN `host` if you only ever sync over
 ```toml
 [remotes.desktop]
 host = "100.64.0.2"            # Tailscale IP — works as both
-ssh_user = "karlo"
+ssh_user = "user"
 tailscale_hostname = "desktop"
 ```
 
@@ -113,7 +113,7 @@ tailscale_hostname = "desktop"
 Make sure your SSH key is authorized on the remote machine. Tailscale handles the network; SSH handles authentication. No extra config needed beyond what you'd do for LAN SSH:
 
 ```bash
-ssh-copy-id karlo@desktop   # uses Tailscale hostname directly once tailscale is up
+ssh-copy-id user@desktop   # uses Tailscale hostname directly once tailscale is up
 ```
 
 ### Why not just use the Tailscale IP always?
@@ -202,6 +202,7 @@ name = "laptop"
 host = "192.168.1.10"
 ssh_user = "karlo"
 tailscale_hostname = "desktop"   # optional — tried first if set
+ssh_port = 2222                  # optional — omit if using default port 22
 ```
 
 ### `~/.config/lintwin/shared.toml` (committed, synced across machines)
