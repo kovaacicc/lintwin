@@ -14,6 +14,7 @@ Two sync strategies:
 - Python 3.11+
 - `git`, `rsync` — `sudo pacman -S git rsync`
 - `gh` (GitHub CLI) — `sudo pacman -S github-cli`, then authenticate: `gh auth login`
+- SSH key added to your GitHub account — lintwin uses SSH URLs for the git remote, so `git push` will fail without it. If you haven't done this: `cat ~/.ssh/id_ed25519.pub` (or `id_rsa.pub`) and add it at https://github.com/settings/keys
 - SSH key-based auth to your other machines (no password prompts during sync)
 
 ## Install
@@ -241,6 +242,10 @@ patterns = [
 **Never synced:** SSH private keys (`~/.ssh/id_*`), caches, GPG keys, and anything matching `[never_sync]` patterns.
 
 **Project repos** (`~/projects/`): lintwin does not touch their contents. It scans for uncommitted or unpushed changes and warns you before sync so you don't lose work.
+
+## Credits
+
+This project was largely built with [Claude Code](https://claude.ai/code), Anthropic's AI coding assistant.
 
 ## What lintwin is not
 

@@ -55,12 +55,15 @@ def _interactive_checklist(title: str, items: list[Path], pre_checked: set[str])
 
 
 def _create_github_repo(name: str) -> str:
-    result = subprocess.run(
-        ["gh", "repo", "create", name, "--private", "--confirm"],
+    subprocess.run(
+        ["gh", "repo", "create", name, "--private"],
         capture_output=True, text=True, check=True,
     )
-    url = result.stdout.strip().splitlines()[-1]
-    return url
+    result = subprocess.run(
+        ["gh", "repo", "view", name, "--json", "sshUrl", "-q", ".sshUrl"],
+        capture_output=True, text=True, check=True,
+    )
+    return result.stdout.strip()
 
 
 @click.command("init")
