@@ -1,0 +1,89 @@
+{
+  "planPath": "docs/superpowers/plans/2026-05-20-lintwin.md",
+  "tasks": [
+    {
+      "id": 8,
+      "subject": "Task 1: Project scaffolding",
+      "status": "pending",
+      "description": "**Goal:** Installable Python package with working `lintwin --help` entry point.\n\n**Files:**\n- Create: `pyproject.toml`\n- Create: `lintwin/__init__.py`, `lintwin/__main__.py`\n- Create: `lintwin/cli/__init__.py`, `lintwin/cli/main.py`\n- Create: `lintwin/core/__init__.py`, `lintwin/core/packages/__init__.py`\n- Create: `tests/conftest.py`, `README.md`\n\n**Acceptance Criteria:**\n- [ ] `pip install -e .` completes without errors\n- [ ] `lintwin --help` prints CLI group help text\n- [ ] `python -m lintwin --help` also works\n- [ ] `pytest` discovers tests directory without errors\n\n**Verify:** `lintwin --help` → prints `Usage: lintwin [OPTIONS] COMMAND [ARGS]...`\n\n```json:metadata\n{\"files\": [\"pyproject.toml\", \"lintwin/__init__.py\", \"lintwin/__main__.py\", \"lintwin/cli/__init__.py\", \"lintwin/cli/main.py\", \"lintwin/core/__init__.py\", \"lintwin/core/packages/__init__.py\", \"tests/conftest.py\", \"README.md\"], \"verifyCommand\": \"lintwin --help\", \"acceptanceCriteria\": [\"pip install -e . succeeds\", \"lintwin --help shows usage\", \"python -m lintwin --help works\", \"pytest discovers tests\"]}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 2: Constants + Config system",
+      "status": "pending",
+      "blockedBy": [8],
+      "description": "**Goal:** Load/save config.toml (local) and shared.toml (committed) as typed dataclasses; provide track_path/untrack_path helpers.\n\n**Files:**\n- Create: `lintwin/core/constants.py`\n- Create: `lintwin/core/config.py`\n- Create: `tests/test_config.py`\n\n**Acceptance Criteria:**\n- [ ] LocalConfig and SharedConfig load/save correctly\n- [ ] track_path adds to correct list and persists\n- [ ] untrack_path removes and returns True/False correctly\n- [ ] `pytest tests/test_config.py` passes (8 tests)\n\n**Verify:** `pytest tests/test_config.py -v` → all 8 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/core/constants.py\", \"lintwin/core/config.py\", \"tests/test_config.py\"], \"verifyCommand\": \"pytest tests/test_config.py -v\", \"acceptanceCriteria\": [\"LocalConfig round-trips through TOML\", \"SharedConfig round-trips through TOML\", \"track_path adds to correct list\", \"untrack_path removes and returns True/False\"]}\n```"
+    },
+    {
+      "id": 10,
+      "subject": "Task 3: track/untrack CLI commands",
+      "status": "pending",
+      "blockedBy": [9],
+      "description": "**Goal:** `lintwin track <path> --via git|rsync` and `lintwin untrack <path>`.\n\n**Verify:** `pytest tests/test_cli_track.py -v` → all 4 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/cli/track.py\", \"tests/test_cli_track.py\", \"lintwin/cli/main.py\"], \"verifyCommand\": \"pytest tests/test_cli_track.py -v\", \"acceptanceCriteria\": [\"track --via git adds to git_paths\", \"track --via rsync adds to rsync_paths\", \"untrack existing returns success\", \"untrack unknown exits nonzero\"]}\n```"
+    },
+    {
+      "id": 11,
+      "subject": "Task 4: Snapshot system",
+      "status": "pending",
+      "blockedBy": [9],
+      "description": "**Goal:** Read/write last_sync.json with per-remote timestamps and file metadata.\n\n**Verify:** `pytest tests/test_snapshot.py -v` → all 4 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/core/snapshot.py\", \"tests/test_snapshot.py\"], \"verifyCommand\": \"pytest tests/test_snapshot.py -v\", \"acceptanceCriteria\": [\"Snapshot round-trips through JSON\", \"load_snapshot returns None for missing file\", \"build_file_snapshot captures size and mtime\"]}\n```"
+    },
+    {
+      "id": 12,
+      "subject": "Task 5: Git subsystem",
+      "status": "pending",
+      "blockedBy": [9],
+      "description": "**Goal:** All bare-repo git operations needed by lintwin sync and status.\n\n**Verify:** `pytest tests/test_git.py -v` → all 5 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/core/git.py\", \"tests/test_git.py\"], \"verifyCommand\": \"pytest tests/test_git.py -v\", \"acceptanceCriteria\": [\"init_bare_repo creates HEAD file\", \"divergence_info correct for in-sync repos\", \"commit returns False with nothing staged\", \"commit returns True when changes staged\"]}\n```"
+    },
+    {
+      "id": 13,
+      "subject": "Task 6: Dirty repo scanner",
+      "status": "pending",
+      "blockedBy": [9],
+      "description": "**Goal:** Walk synced paths, find .git directories, detect uncommitted/unpushed state.\n\n**Verify:** `pytest tests/test_scanner.py -v` → all 4 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/core/scanner.py\", \"tests/test_scanner.py\"], \"verifyCommand\": \"pytest tests/test_scanner.py -v\", \"acceptanceCriteria\": [\"find_git_repos locates .git dirs\", \"check_dirty returns None for clean repo\", \"scan_for_dirty_repos filters correctly\"]}\n```"
+    },
+    {
+      "id": 14,
+      "subject": "Task 7: PackageManager ABC + Arch implementation",
+      "status": "pending",
+      "blockedBy": [8],
+      "description": "**Goal:** ABC + pacman/AUR/pip/npm implementations; get_available_managers() auto-detects.\n\n**Verify:** `pytest tests/test_packages.py -v` → all 5 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/core/packages/base.py\", \"lintwin/core/packages/arch.py\", \"tests/test_packages.py\"], \"verifyCommand\": \"pytest tests/test_packages.py -v\", \"acceptanceCriteria\": [\"PacmanManager is subclass of PackageManager\", \"diff returns missing/extra correctly\", \"get_available_managers returns list\"]}\n```"
+    },
+    {
+      "id": 15,
+      "subject": "Task 8: Rsync subsystem",
+      "status": "pending",
+      "blockedBy": [9, 11],
+      "description": "**Goal:** Connectivity check (Tailscale → direct fallback), conflict detection, rsync call builder.\n\n**Verify:** `pytest tests/test_rsync.py -v` → all 7 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/core/rsync.py\", \"tests/test_rsync.py\"], \"verifyCommand\": \"pytest tests/test_rsync.py -v\", \"acceptanceCriteria\": [\"check_connectivity uses tailscale when hostname set\", \"detect_conflicts catches both-modified case\", \"detect_conflicts ignores one-sided\", \"_is_binary correct\"]}\n```"
+    },
+    {
+      "id": 16,
+      "subject": "Task 9: lintwin init wizard",
+      "status": "pending",
+      "blockedBy": [9, 12],
+      "description": "**Goal:** lintwin init (full wizard) and lintwin init --join (join existing setup).\n\n**Verify:** `pytest tests/test_cli_init.py -v` → all 5 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/cli/init.py\", \"tests/test_cli_init.py\", \"lintwin/cli/main.py\"], \"verifyCommand\": \"pytest tests/test_cli_init.py -v\", \"acceptanceCriteria\": [\"check_prerequisites returns list\", \"discover_dotfiles excludes noise\", \"discover_rsync_dirs finds non-hidden dirs\", \"lintwin init --help works\"]}\n```"
+    },
+    {
+      "id": 17,
+      "subject": "Task 10: lintwin sync command",
+      "status": "pending",
+      "blockedBy": [12, 13, 15, 16],
+      "description": "**Goal:** Full sync orchestration: dirty-repo scan → preview → git sync → rsync → snapshot update.\n\n**Verify:** `pytest tests/test_cli_sync.py -v` → all 4 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/cli/sync.py\", \"tests/test_cli_sync.py\", \"lintwin/cli/main.py\"], \"verifyCommand\": \"pytest tests/test_cli_sync.py -v\", \"acceptanceCriteria\": [\"--dry-run exits without changes\", \"dirty repos shown\", \"unreachable remote warns\", \"sync --help works\"]}\n```"
+    },
+    {
+      "id": 18,
+      "subject": "Task 11: lintwin status, pull, and diff commands",
+      "status": "pending",
+      "blockedBy": [17],
+      "description": "**Goal:** Read-only status, pull-only sync, and file-level diff vs remote.\n\n**Verify:** `pytest tests/test_cli_status.py -v` → all 4 tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/cli/status.py\", \"lintwin/cli/pull.py\", \"lintwin/cli/diff.py\", \"tests/test_cli_status.py\", \"lintwin/cli/main.py\"], \"verifyCommand\": \"pytest tests/test_cli_status.py -v\", \"acceptanceCriteria\": [\"status shows machine name\", \"pull --help works\", \"diff --help works\", \"status --help works\"]}\n```"
+    },
+    {
+      "id": 19,
+      "subject": "Task 12: lintwin packages commands",
+      "status": "pending",
+      "blockedBy": [14, 17],
+      "description": "**Goal:** lintwin packages export/diff/install subcommands.\n\n**Verify:** `pytest -v` → all tests PASSED\n\n```json:metadata\n{\"files\": [\"lintwin/cli/packages.py\", \"tests/test_cli_packages.py\", \"lintwin/cli/main.py\"], \"verifyCommand\": \"pytest -v\", \"acceptanceCriteria\": [\"packages export writes JSON files\", \"packages --help shows subcommands\", \"full test suite passes\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-05-20T00:00:00+00:00"
+}
