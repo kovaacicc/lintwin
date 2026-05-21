@@ -91,13 +91,13 @@ def _node_display_mode(node: SelectorNode) -> DisplayMode:
 _CYCLE_ORDER: list[Mode] = ["skip", "git", "rsync"]
 
 
-def _cycle_mode(node: SelectorNode, nodes: list[SelectorNode]) -> None:
+def _cycle_mode(node: SelectorNode) -> None:
     display = _node_display_mode(node)
     if display == "mixed":
         next_mode: Mode = "git"
     else:
         idx = _CYCLE_ORDER.index(display)
-        next_mode = _CYCLE_ORDER[(idx + 1) % 3]
+        next_mode = _CYCLE_ORDER[(idx + 1) % len(_CYCLE_ORDER)]
     node.mode = next_mode
     if node.children_loaded:
         for child in node.children:
@@ -105,6 +105,7 @@ def _cycle_mode(node: SelectorNode, nodes: list[SelectorNode]) -> None:
 
 
 def _compute_totals(nodes: list[SelectorNode]) -> tuple[int, int]:
+    # nodes must be the top-level list only — never a recursive walk
     git_bytes = 0
     rsync_bytes = 0
     for node in nodes:

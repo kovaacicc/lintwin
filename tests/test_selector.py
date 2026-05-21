@@ -1,6 +1,20 @@
 from pathlib import Path
-from lintwin.cli.selector import SelectorNode, _scan_home, _load_children, _get_size
 
+from lintwin.cli.selector import (
+    SelectorNode,
+    _compute_totals,
+    _cycle_mode,
+    _derive_paths,
+    _flatten,
+    _fmt_size,
+    _get_size,
+    _load_children,
+    _node_display_mode,
+    _scan_home,
+)
+
+
+# ── SelectorNode / scanning ───────────────────────────────────────────────────
 
 def test_selector_node_defaults() -> None:
     node = SelectorNode(path=Path("/tmp/x"))
@@ -65,15 +79,16 @@ def test_load_children_idempotent(tmp_path: Path) -> None:
     assert len(node.children) == 1
 
 
-from lintwin.cli.selector import (
-    _cycle_mode, _compute_totals, _derive_paths, _flatten, _node_display_mode,
-)
-
-
 # ── _node_display_mode ────────────────────────────────────────────────────────
 
 def test_display_mode_no_children() -> None:
     node = SelectorNode(path=Path("/tmp/x"), mode="git")
+    assert _node_display_mode(node) == "git"
+
+
+def test_display_mode_loaded_empty_children() -> None:
+    node = SelectorNode(path=Path("/tmp/x"), mode="git")
+    node.children_loaded = True  # loaded but empty
     assert _node_display_mode(node) == "git"
 
 
@@ -101,15 +116,13 @@ def test_display_mode_mixed() -> None:
 
 def test_cycle_mode_skip_to_git() -> None:
     node = SelectorNode(path=Path("/tmp/x"), mode="skip")
-    nodes = [node]
-    _cycle_mode(node, nodes)
+    _cycle_mode(node)
     assert node.mode == "git"
 
 
 def test_cycle_mode_rsync_to_skip() -> None:
     node = SelectorNode(path=Path("/tmp/x"), mode="rsync")
-    nodes = [node]
-    _cycle_mode(node, nodes)
+    _cycle_mode(node)
     assert node.mode == "skip"
 
 
@@ -120,8 +133,7 @@ def test_cycle_mode_mixed_to_git() -> None:
         SelectorNode(path=Path("/tmp/x/b"), mode="rsync"),
     ]
     parent.children_loaded = True
-    nodes = [parent]
-    _cycle_mode(parent, nodes)
+    _cycle_mode(parent)
     assert parent.mode == "git"
     assert all(c.mode == "git" for c in parent.children)
 
@@ -133,8 +145,7 @@ def test_cycle_mode_propagates_to_loaded_children() -> None:
         SelectorNode(path=Path("/tmp/x/b"), mode="skip"),
     ]
     parent.children_loaded = True
-    nodes = [parent]
-    _cycle_mode(parent, nodes)
+    _cycle_mode(parent)
     assert parent.mode == "git"
     assert all(c.mode == "git" for c in parent.children)
 
@@ -254,9 +265,9 @@ def test_flatten_expanded_node_shows_children() -> None:
     parent.expanded = True
     flat = _flatten([parent])
     assert len(flat) == 3
-    assert flat[0][1] == 0   # parent depth 0
-    assert flat[1][1] == 1   # child depth 1
-    assert flat[2][2] is True   # last child is_last=True
+    assert flat[0][1] == 0        # parent depth 0
+    assert flat[1][1] == 1        # child depth 1
+    assert flat[2][2] is True     # last child is_last=True
 
 
 def test_flatten_collapsed_hides_children() -> None:
@@ -266,3 +277,24 @@ def test_flatten_collapsed_hides_children() -> None:
     parent.expanded = False
     flat = _flatten([parent])
     assert len(flat) == 1
+
+
+# ── _fmt_size ─────────────────────────────────────────────────────────────────
+
+def test_fmt_size_bytes() -> None:
+    assert _fmt_size(0) == "0 B"
+    assert _fmt_size(500) == "500 B"
+    assert _fmt_size(1023) == "1023 B"
+
+
+def test_fmt_size_kilobytes() -> None:
+    assert _fmt_size(1024) == "1.0 KB"
+    assert _fmt_size(2048) == "2.0 KB"
+
+
+def test_fmt_size_megabytes() -> None:
+    assert _fmt_size(1024 ** 2) == "1.0 MB"
+
+
+def test_fmt_size_gigabytes() -> None:
+    assert _fmt_size(1024 ** 3) == "1.0 GB"
