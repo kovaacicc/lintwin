@@ -9,7 +9,7 @@ from typing import Literal
 from lintwin.core.constants import DEFAULT_GIT_PATHS, DEFAULT_RSYNC_PATHS, NOISE_DOTFILES
 
 Mode = Literal["skip", "git", "rsync"]
-DisplayMode = Literal["skip", "git", "rsync", "mixed"]
+DisplayMode = Literal["skip", "git", "rsync", "mixed"]  # used by _node_display_mode
 
 
 @dataclass
@@ -53,6 +53,8 @@ def _default_mode(path: Path) -> Mode:
 
 
 def _scan_home(home: Path) -> list[SelectorNode]:
+    if not home.is_dir():
+        return []
     nodes = []
     for item in sorted(home.iterdir()):
         if item.name in NOISE_DOTFILES:
