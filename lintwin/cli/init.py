@@ -8,7 +8,7 @@ from lintwin.core.config import (
     save_local_config, save_shared_config, load_shared_config,
 )
 from lintwin.core.constants import (
-    BARE_REPO, LOCAL_CONFIG_PATH, SHARED_CONFIG_PATH,
+    BARE_REPO, LOCAL_CONFIG_PATH, SHARED_CONFIG_PATH, DEFAULT_MAX_GIT_FILE_MB,
 )
 from lintwin.core import git as git_core
 from lintwin.cli.selector import run_selector
@@ -43,7 +43,10 @@ def _create_github_repo(name: str) -> str:
               help="Join an existing lintwin setup from this git remote URL.")
 @click.option("--name", "machine_name", default=None, metavar="NAME",
               help="Machine name (skips the interactive prompt).")
-def init_cmd(repo_url: str | None, machine_name: str | None) -> None:
+@click.option("--max-git-file-mb", "max_git_file_mb", type=int,
+              default=DEFAULT_MAX_GIT_FILE_MB, metavar="N", show_default=True,
+              help="Flag git files/dirs larger than this many MB before sync. Fresh init only.")
+def init_cmd(repo_url: str | None, machine_name: str | None, max_git_file_mb: int) -> None:
     """Set up lintwin on this machine."""
     missing = check_prerequisites()
     if missing:
@@ -56,10 +59,11 @@ def init_cmd(repo_url: str | None, machine_name: str | None) -> None:
     if repo_url:
         _run_join(repo_url, home, machine_name)
     else:
-        _run_init(home, machine_name)
+        _run_init(home, machine_name, max_git_file_mb)
 
 
-def _run_init(home: Path, machine_name: str | None = None) -> None:
+def _run_init(home: Path, machine_name: str | None = None,
+              max_git_file_mb: int = DEFAULT_MAX_GIT_FILE_MB) -> None:
     if machine_name is None:
         machine_name = Prompt.ask("Name this machine", default="laptop")
 
@@ -74,7 +78,10 @@ def _run_init(home: Path, machine_name: str | None = None) -> None:
 
     git_paths, rsync_paths = run_selector(home)
 
-    shared = SharedConfig(git_paths=git_paths, rsync_paths=rsync_paths)
+    shared = SharedConfig(
+        git_paths=git_paths, rsync_paths=rsync_paths,
+        max_git_file_mb=max_git_file_mb,
+    )
     save_shared_config(shared, SHARED_CONFIG_PATH)
 
     local = LocalConfig(machine_name=machine_name, remotes={})
