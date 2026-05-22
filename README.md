@@ -52,6 +52,14 @@ The wizard will:
 4. Open an interactive selector — arrow-key through your home directory, drill into folders, and assign each item to git, rsync, or skip (with live size totals)
 5. Initialize the bare repo, commit and push `shared.toml`
 
+To change the size threshold for the pre-sync guard (default 25 MB), pass `--max-git-file-mb`:
+
+```bash
+lintwin init --max-git-file-mb 50
+```
+
+This value is written into `shared.toml` and applies on every machine that shares it.
+
 At the end it prints the `--join` command to run on your other machines.
 
 ### Every other machine
@@ -129,6 +137,11 @@ lintwin sync --dry-run  # preview only — no changes applied
 lintwin pull            # pull only (no push)
 ```
 
+Before committing, `lintwin sync` scans git-tracked paths for new files or directories that
+exceed the configured size threshold (default 25 MB). For each oversized item it prompts you to:
+offload it to rsync, add it to never-sync, or keep it in git and commit anyway. This prevents
+accidentally bloating the git history with large binaries.
+
 When you have more than one remote configured, pass `--to`:
 
 ```bash
@@ -159,6 +172,7 @@ Package lists live in `~/.local/share/lintwin/packages/` and are committed to yo
 ```
 lintwin init                                first-run wizard
 lintwin init --name <name>                  skip the machine name prompt
+lintwin init --max-git-file-mb <N>          set size-guard threshold (default 25 MB)
 lintwin init --join <url>                   join existing setup on a new machine
 lintwin init --join <url> --name <name>     join with a specific machine name
 

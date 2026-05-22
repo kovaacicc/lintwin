@@ -8,10 +8,10 @@ Built in Python, lives at `~/.config/lintwin/` (config) and `~/.local/share/lint
 ## Project structure
 ```
 lintwin/
-  cli/          main.py, init.py, sync.py, status.py, pull.py, diff.py, track.py, packages.py, selector.py
-  core/         git.py, rsync.py, scanner.py, snapshot.py, config.py, constants.py
+  cli/          main.py, init.py, sync.py, status.py, pull.py, diff.py, track.py, packages.py, selector.py, format.py
+  core/         git.py, rsync.py, scanner.py, snapshot.py, config.py, constants.py, sizeguard.py
   core/packages/  base.py (ABC), arch.py (pacman/AUR/pip/npm)
-tests/          81 unit tests, all passing
+tests/          98 unit tests, all passing
 README.md       full user docs including Tailscale setup
 pyproject.toml  entry point: lintwin.cli.main:cli
 .venv/          virtualenv — use .venv/bin/python and .venv/bin/lintwin
@@ -31,10 +31,14 @@ pyproject.toml  entry point: lintwin.cli.main:cli
 - `~/.local/share/lintwin/last_sync.json` — rsync snapshot for conflict detection
 
 ## Implementation status
-All 12 planned tasks complete. 81/81 tests passing.
+All planned tasks complete. 98/98 tests passing.
 Commands: init, sync, status, pull, diff, track, untrack, packages (export/diff/install)
 `lintwin init` uses an interactive arrow-key selector (`cli/selector.py`, built on `rich.Live`
 + `readchar`) to assign home-directory items to git/rsync/skip with live size totals.
+Before each `lintwin sync`, `core/sizeguard.py` scans git-tracked paths for oversized new
+files/dirs and prompts the user to offload them to rsync, add them to never-sync, or commit
+anyway. The threshold defaults to 25 MB and can be set at init time with `--max-git-file-mb N`
+(written into `shared.toml`).
 
 ## Known gaps (not yet implemented)
 - No `lintwin remote add` command — remotes added only during `init` wizard or by hand-editing config.toml
