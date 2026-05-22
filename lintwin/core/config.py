@@ -82,6 +82,7 @@ def save_shared_config(config: SharedConfig, path: Path = SHARED_CONFIG_PATH) ->
         "rsync_paths": {"paths": config.rsync_paths},
         "never_sync": {"patterns": config.never_sync},
         "git_excludes": {"paths": config.git_excludes},
+        # [size_guard] is a sub-table so future guard options can be added without new top-level keys.
         "size_guard": {"max_git_file_mb": config.max_git_file_mb},
     }
     with open(path, "wb") as f:

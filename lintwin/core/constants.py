@@ -35,7 +35,7 @@ DEFAULT_NEVER_SYNC: list[str] = [
     "~/.gnupg",
 ]
 
-DEFAULT_MAX_GIT_FILE_MB = 25
+DEFAULT_MAX_GIT_FILE_MB: int = 25
 
 NOISE_DOTFILES: set[str] = {
     ".cache", ".gnupg", ".mozilla", ".thunderbird", ".dbus",
