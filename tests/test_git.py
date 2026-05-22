@@ -4,7 +4,7 @@ import pytest
 from lintwin.core.git import (
     init_bare_repo, _git, set_remote,
     divergence_info, stage_paths, commit,
-    status_short, log_oneline,
+    status_short, log_oneline, list_tracked_files,
 )
 
 
@@ -66,3 +66,24 @@ def test_status_short_returns_modified(bare_repo) -> None:
     (work / "hello.txt").write_text("changed")
     changes = status_short([str(work / "hello.txt")], bare_repo=repo, work_tree=work)
     assert any("hello.txt" in path for _, path in changes)
+
+
+def test_list_tracked_files(bare_repo) -> None:
+    repo, work = bare_repo
+    tracked = list_tracked_files(bare_repo=repo, work_tree=work)
+    assert str(work / "hello.txt") in tracked
+
+
+def test_stage_paths_honors_excludes(bare_repo) -> None:
+    repo, work = bare_repo
+    (work / "keep.txt").write_text("keep")
+    (work / "skip.bin").write_text("skip")
+    stage_paths(
+        [str(work / "keep.txt"), str(work / "skip.bin")],
+        bare_repo=repo, work_tree=work,
+        excludes=[str(work / "skip.bin")],
+    )
+    commit("add keep", bare_repo=repo, work_tree=work)
+    tracked = list_tracked_files(bare_repo=repo, work_tree=work)
+    assert str(work / "keep.txt") in tracked
+    assert str(work / "skip.bin") not in tracked

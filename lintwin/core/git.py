@@ -67,10 +67,34 @@ def divergence_info(branch: str = "main", bare_repo: Path = BARE_REPO) -> tuple[
     return int(parts[0]), int(parts[1])
 
 
-def stage_paths(paths: list[str], bare_repo: Path = BARE_REPO, work_tree: Path | None = None) -> None:
+def list_tracked_files(bare_repo: Path = BARE_REPO, work_tree: Path | None = None) -> set[str]:
+    if work_tree is None:
+        work_tree = Path.home()
+    result = _git("ls-files", "--full-name", bare_repo=bare_repo, work_tree=work_tree, check=False)
+    if result.returncode != 0:
+        return set()
+    return {str(work_tree / line) for line in result.stdout.splitlines() if line}
+
+
+def stage_paths(
+    paths: list[str],
+    bare_repo: Path = BARE_REPO,
+    work_tree: Path | None = None,
+    excludes: list[str] | None = None,
+) -> None:
     existing = [str(Path(p).expanduser()) for p in paths if Path(p).expanduser().exists()]
-    if existing:
-        _git("add", "--", *existing, bare_repo=bare_repo, work_tree=work_tree)
+    if not existing:
+        return
+    wt = work_tree if work_tree is not None else Path.home()
+    pathspecs = list(existing)
+    for entry in excludes or []:
+        resolved = Path(entry).expanduser()
+        try:
+            rel = resolved.relative_to(wt)
+        except ValueError:
+            continue  # not under the work tree (e.g. a bare glob) — git can't exclude it here
+        pathspecs.append(f":(exclude){rel}")
+    _git("add", "--", *pathspecs, bare_repo=bare_repo, work_tree=work_tree)
 
 
 def commit(message: str, bare_repo: Path = BARE_REPO, work_tree: Path | None = None) -> bool:
