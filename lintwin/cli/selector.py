@@ -177,5 +177,123 @@ def _fmt_size(size: int) -> str:
     return f"{size} B"
 
 
+_MODE_BADGE: dict[str, tuple[str, str]] = {
+    "git":   ("[git  ]", "green"),
+    "rsync": ("[rsync]", "yellow"),
+    "skip":  ("[skip ]", "dim"),
+    "mixed": ("[mixed]", "cyan"),
+}
+
+
+def _render(
+    flat: list[tuple[SelectorNode, int, bool]],
+    cursor: int,
+    nodes: list[SelectorNode],
+) -> "Text":
+    from rich.text import Text
+
+    git_bytes, rsync_bytes = _compute_totals(nodes)
+    lines: list[Text] = []
+
+    totals = Text()
+    totals.append("── git ", style="dim")
+    totals.append(_fmt_size(git_bytes), style="green bold")
+    totals.append("  ·  rsync ", style="dim")
+    totals.append(_fmt_size(rsync_bytes), style="yellow bold")
+    totals.append("  " + "─" * 38, style="dim")
+    lines.append(totals)
+
+    for i, (node, depth, is_last) in enumerate(flat):
+        selected = i == cursor
+        line = Text()
+
+        line.append("▶ " if selected else "  ", style="bold cyan" if selected else "")
+
+        if depth == 1:
+            line.append("└ " if is_last else "├ ", style="dim")
+
+        display = _node_display_mode(node)
+        badge, badge_style = _MODE_BADGE[display]
+        line.append(badge + "  ", style=badge_style)
+
+        name = node.path.name + ("/" if node.path.is_dir() else "")
+        line.append(f"{name:<32}", style="bold" if selected else "")
+        line.append(_fmt_size(node.size), style="dim")
+
+        lines.append(line)
+
+    footer = Text(
+        "\n  ↑↓ navigate  ·  space cycle  ·  → expand  ·  ← collapse  ·  enter confirm  ·  q cancel",
+        style="dim",
+    )
+    lines.append(footer)
+
+    result = Text()
+    for j, line in enumerate(lines):
+        result.append_text(line)
+        if j < len(lines) - 1:
+            result.append("\n")
+    return result
+
+
 def run_selector(home: Path) -> tuple[list[str], list[str]]:
-    raise NotImplementedError("implemented in task 3")
+    import readchar
+    from rich.console import Console
+    from rich.live import Live
+
+    console = Console()
+    console.print("[dim]Scanning home directory...[/dim]")
+    nodes = _scan_home(home)
+
+    cursor = 0
+    flat = _flatten(nodes)
+
+    with Live(
+        _render(flat, cursor, nodes),
+        console=console,
+        refresh_per_second=30,
+        screen=False,
+    ) as live:
+        while True:
+            key = readchar.readkey()
+
+            if key == readchar.key.UP:
+                cursor = max(0, cursor - 1)
+
+            elif key == readchar.key.DOWN:
+                cursor = min(len(flat) - 1, cursor + 1)
+
+            elif key == " ":
+                node, _depth, _last = flat[cursor]
+                _cycle_mode(node)
+
+            elif key == readchar.key.RIGHT:
+                node, depth, _last = flat[cursor]
+                if depth == 0 and node.path.is_dir():
+                    _load_children(node)
+                    node.expanded = True
+                    flat = _flatten(nodes)
+
+            elif key == readchar.key.LEFT:
+                node, depth, _last = flat[cursor]
+                if depth == 1:
+                    parent_idx = next(
+                        i for i in range(cursor - 1, -1, -1)
+                        if flat[i][1] == 0
+                    )
+                    flat[parent_idx][0].expanded = False
+                    flat = _flatten(nodes)
+                    cursor = parent_idx
+                elif node.expanded:
+                    node.expanded = False
+                    flat = _flatten(nodes)
+
+            elif key in (readchar.key.ENTER, "\r", "\n"):
+                return _derive_paths(nodes, home)
+
+            elif key in ("q", "Q"):
+                console.print("[yellow]Init cancelled.[/yellow]")
+                raise SystemExit(0)
+
+            cursor = min(cursor, len(flat) - 1)
+            live.update(_render(flat, cursor, nodes))
