@@ -47,7 +47,11 @@ def scan_oversized(
     bare_repo: Path,
     work_tree: Path,
 ) -> list[FlaggedItem]:
-    """Oversized untracked files/dirs that this sync would newly commit to git."""
+    """Oversized untracked files/dirs that this sync would newly commit to git.
+
+    git_paths entries that point directly at a file (not a directory) are skipped:
+    a file chosen explicitly as a tracked path is the user's deliberate decision.
+    """
     tracked = list_tracked_files(bare_repo, work_tree)
     excluded = {str(Path(e).expanduser()) for e in exclusions}
     flagged: list[FlaggedItem] = []
