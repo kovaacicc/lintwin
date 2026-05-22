@@ -49,9 +49,8 @@ The wizard will:
 1. Check `git`, `rsync`, `gh` are installed
 2. Ask for a machine name — use something descriptive like `desktop`, `laptop`, `work-pc`
 3. Create a private GitHub repo (or use an existing one)
-4. Show your dotfiles — you choose which to track with git
-5. Show your home directories — you choose which to sync with rsync
-6. Initialize the bare repo, commit and push `shared.toml`
+4. Open an interactive selector — arrow-key through your home directory, drill into folders, and assign each item to git, rsync, or skip (with live size totals)
+5. Initialize the bare repo, commit and push `shared.toml`
 
 At the end it prints the `--join` command to run on your other machines.
 
