@@ -5,6 +5,7 @@ from pathlib import Path
 from .constants import (
     LOCAL_CONFIG_PATH, SHARED_CONFIG_PATH,
     DEFAULT_GIT_PATHS, DEFAULT_RSYNC_PATHS, DEFAULT_NEVER_SYNC,
+    DEFAULT_MAX_GIT_FILE_MB,
 )
 
 
@@ -27,6 +28,8 @@ class SharedConfig:
     git_paths: list[str] = field(default_factory=lambda: list(DEFAULT_GIT_PATHS))
     rsync_paths: list[str] = field(default_factory=lambda: list(DEFAULT_RSYNC_PATHS))
     never_sync: list[str] = field(default_factory=lambda: list(DEFAULT_NEVER_SYNC))
+    git_excludes: list[str] = field(default_factory=list)
+    max_git_file_mb: int = DEFAULT_MAX_GIT_FILE_MB
 
 
 def load_local_config(path: Path = LOCAL_CONFIG_PATH) -> LocalConfig:
@@ -67,6 +70,8 @@ def load_shared_config(path: Path = SHARED_CONFIG_PATH) -> SharedConfig:
         git_paths=data.get("git_paths", {}).get("paths", list(DEFAULT_GIT_PATHS)),
         rsync_paths=data.get("rsync_paths", {}).get("paths", list(DEFAULT_RSYNC_PATHS)),
         never_sync=data.get("never_sync", {}).get("patterns", list(DEFAULT_NEVER_SYNC)),
+        git_excludes=data.get("git_excludes", {}).get("paths", []),
+        max_git_file_mb=data.get("size_guard", {}).get("max_git_file_mb", DEFAULT_MAX_GIT_FILE_MB),
     )
 
 
@@ -76,6 +81,8 @@ def save_shared_config(config: SharedConfig, path: Path = SHARED_CONFIG_PATH) ->
         "git_paths": {"paths": config.git_paths},
         "rsync_paths": {"paths": config.rsync_paths},
         "never_sync": {"patterns": config.never_sync},
+        "git_excludes": {"paths": config.git_excludes},
+        "size_guard": {"max_git_file_mb": config.max_git_file_mb},
     }
     with open(path, "wb") as f:
         tomli_w.dump(data, f)

@@ -98,3 +98,24 @@ def test_untrack_path_not_found(tmp_path: Path) -> None:
     _write_shared(cfg_path, [], [], [])
     result = untrack_path("~/.vimrc", cfg_path)
     assert result is False
+
+
+def test_shared_config_roundtrips_size_guard_fields(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "shared.toml"
+    cfg = SharedConfig(
+        git_paths=["~/.bashrc"],
+        git_excludes=["~/.config/big.bin"],
+        max_git_file_mb=50,
+    )
+    save_shared_config(cfg, cfg_path)
+    loaded = load_shared_config(cfg_path)
+    assert loaded.git_excludes == ["~/.config/big.bin"]
+    assert loaded.max_git_file_mb == 50
+
+
+def test_shared_config_defaults_when_size_guard_sections_absent(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "shared.toml"
+    _write_shared(cfg_path, ["~/.bashrc"], ["~/Downloads"], ["~/.cache"])
+    loaded = load_shared_config(cfg_path)
+    assert loaded.git_excludes == []
+    assert loaded.max_git_file_mb == 25
