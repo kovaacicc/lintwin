@@ -68,8 +68,7 @@ def divergence_info(branch: str = "main", bare_repo: Path = BARE_REPO) -> tuple[
 
 
 def list_tracked_files(bare_repo: Path = BARE_REPO, work_tree: Path | None = None) -> set[str]:
-    if work_tree is None:
-        work_tree = Path.home()
+    work_tree = (Path.home() if work_tree is None else Path(work_tree).expanduser()).resolve()
     result = _git("ls-files", "--full-name", bare_repo=bare_repo, work_tree=work_tree, check=False)
     if result.returncode != 0:
         return set()
@@ -85,7 +84,7 @@ def stage_paths(
     existing = [str(Path(p).expanduser()) for p in paths if Path(p).expanduser().exists()]
     if not existing:
         return
-    wt = work_tree if work_tree is not None else Path.home()
+    wt = (Path.home() if work_tree is None else Path(work_tree).expanduser()).resolve()
     pathspecs = list(existing)
     for entry in excludes or []:
         resolved = Path(entry).expanduser()

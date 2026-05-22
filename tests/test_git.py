@@ -87,3 +87,26 @@ def test_stage_paths_honors_excludes(bare_repo) -> None:
     tracked = list_tracked_files(bare_repo=repo, work_tree=work)
     assert str(work / "keep.txt") in tracked
     assert str(work / "skip.bin") not in tracked
+
+
+def test_list_tracked_files_empty_repo(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    work = tmp_path / "work"
+    work.mkdir()
+    init_bare_repo(repo)
+    assert list_tracked_files(bare_repo=repo, work_tree=work) == set()
+
+
+def test_stage_paths_exclude_outside_work_tree_is_ignored(bare_repo, tmp_path: Path) -> None:
+    repo, work = bare_repo
+    (work / "inside.txt").write_text("inside")
+    outside = tmp_path / "outside.bin"
+    outside.write_text("outside")
+    stage_paths(
+        [str(work / "inside.txt")],
+        bare_repo=repo, work_tree=work,
+        excludes=[str(outside)],
+    )
+    commit("add inside", bare_repo=repo, work_tree=work)
+    tracked = list_tracked_files(bare_repo=repo, work_tree=work)
+    assert str(work / "inside.txt") in tracked
