@@ -93,3 +93,15 @@ def test_apply_size_resolution_commit_anyway_is_noop() -> None:
     assert shared.git_excludes == []
     assert shared.never_sync == []
     assert shared.rsync_paths == []
+
+
+def test_apply_size_resolution_is_idempotent() -> None:
+    from lintwin.cli.sync import apply_size_resolution
+    from lintwin.core.config import SharedConfig
+    from lintwin.core.sizeguard import FlaggedItem
+    shared = SharedConfig(git_paths=[], rsync_paths=[], never_sync=[])
+    item = FlaggedItem("~/.config/big.bin", 99, False)
+    apply_size_resolution(shared, item, "r")
+    apply_size_resolution(shared, item, "r")
+    assert shared.git_excludes == ["~/.config/big.bin"]
+    assert shared.rsync_paths == ["~/.config/big.bin"]

@@ -6,12 +6,12 @@ from lintwin.cli.selector import (
     _cycle_mode,
     _derive_paths,
     _flatten,
-    _fmt_size,
     _get_size,
     _load_children,
     _node_display_mode,
     _scan_home,
 )
+from lintwin.cli.format import fmt_size
 
 
 # ── SelectorNode / scanning ───────────────────────────────────────────────────
@@ -279,22 +279,22 @@ def test_flatten_collapsed_hides_children() -> None:
     assert len(flat) == 1
 
 
-# ── _fmt_size ─────────────────────────────────────────────────────────────────
+# ── fmt_size ──────────────────────────────────────────────────────────────────
 
 def test_fmt_size_bytes() -> None:
-    assert _fmt_size(0) == "0 B"
-    assert _fmt_size(500) == "500 B"
-    assert _fmt_size(1023) == "1023 B"
+    assert fmt_size(0) == "0 B"
+    assert fmt_size(500) == "500 B"
+    assert fmt_size(1023) == "1023 B"
 
 
 def test_fmt_size_kilobytes() -> None:
-    assert _fmt_size(1024) == "1.0 KB"
-    assert _fmt_size(2048) == "2.0 KB"
+    assert fmt_size(1024) == "1.0 KB"
+    assert fmt_size(2048) == "2.0 KB"
 
 
 def test_fmt_size_megabytes() -> None:
-    assert _fmt_size(1024 ** 2) == "1.0 MB"
+    assert fmt_size(1024 ** 2) == "1.0 MB"
 
 
 def test_fmt_size_gigabytes() -> None:
-    assert _fmt_size(1024 ** 3) == "1.0 GB"
+    assert fmt_size(1024 ** 3) == "1.0 GB"

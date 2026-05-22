@@ -12,7 +12,7 @@ from lintwin.core.snapshot import load_snapshot, save_snapshot, build_file_snaps
 from lintwin.core import git as git_core
 from lintwin.core.constants import BARE_REPO, SNAPSHOT_FILE
 from lintwin.core.sizeguard import scan_oversized, FlaggedItem
-from lintwin.cli.selector import _fmt_size
+from lintwin.cli.format import fmt_size
 
 git_status_short = git_core.status_short
 
@@ -50,7 +50,7 @@ def _show_git_preview(changes: list[tuple[str, str]]) -> None:
 
 
 def apply_size_resolution(shared: SharedConfig, item: FlaggedItem, choice: str) -> None:
-    """Mutate shared config for one guard resolution. 'g' (commit anyway) is a no-op."""
+    """Mutate shared config for one guard resolution. 'g' and any unrecognized choice are no-ops."""
     if choice == "r":
         if item.path not in shared.git_excludes:
             shared.git_excludes.append(item.path)
@@ -80,19 +80,19 @@ def _run_size_guard(shared: SharedConfig, dry_run: bool) -> bool:
     if dry_run:
         for item in flagged:
             kind = "dir " if item.is_dir else "file"
-            console.print(f"  [{kind}] {item.path}  {_fmt_size(item.size)}")
+            console.print(f"  [{kind}] {item.path}  {fmt_size(item.size)}")
         console.print("[dim]--dry-run: no prompts, no changes.[/dim]")
         return True
     changed = False
     for item in flagged:
-        console.print(f"\n  [cyan]{item.path}[/cyan]  {_fmt_size(item.size)}")
+        console.print(f"\n  [cyan]{item.path}[/cyan]  {fmt_size(item.size)}")
         choice = click.prompt(
             "  [r] offload to rsync  [n] never-sync  [g] commit to git anyway  [a] abort sync",
             default="r",
         ).strip().lower()
         if choice == "a":
             console.print("Aborted.")
-            return False
+            return False  # abort discards any partial resolutions — nothing is persisted
         if choice in ("r", "n"):
             apply_size_resolution(shared, item, choice)
             changed = True

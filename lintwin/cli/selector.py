@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from lintwin.core.constants import DEFAULT_GIT_PATHS, DEFAULT_RSYNC_PATHS, NOISE_DOTFILES
+from lintwin.cli.format import fmt_size
 
 Mode = Literal["skip", "git", "rsync"]
 DisplayMode = Literal["skip", "git", "rsync", "mixed"]  # used by _node_display_mode
@@ -170,13 +171,6 @@ def _flatten(
     return flat
 
 
-def _fmt_size(size: int) -> str:
-    for unit, threshold in [("GB", 1 << 30), ("MB", 1 << 20), ("KB", 1 << 10)]:
-        if size >= threshold:
-            return f"{size / threshold:.1f} {unit}"
-    return f"{size} B"
-
-
 _MODE_BADGE: dict[str, tuple[str, str]] = {
     "git":   ("[git  ]", "green"),
     "rsync": ("[rsync]", "yellow"),
@@ -197,9 +191,9 @@ def _render(
 
     totals = Text()
     totals.append("── git ", style="dim")
-    totals.append(_fmt_size(git_bytes), style="green bold")
+    totals.append(fmt_size(git_bytes), style="green bold")
     totals.append("  ·  rsync ", style="dim")
-    totals.append(_fmt_size(rsync_bytes), style="yellow bold")
+    totals.append(fmt_size(rsync_bytes), style="yellow bold")
     totals.append("  " + "─" * 38, style="dim")
     lines.append(totals)
 
@@ -218,7 +212,7 @@ def _render(
 
         name = node.path.name + ("/" if node.path.is_dir() else "")
         line.append(f"{name:<32}", style="bold" if selected else "")
-        line.append(_fmt_size(node.size), style="dim")
+        line.append(fmt_size(node.size), style="dim")
 
         lines.append(line)
 
