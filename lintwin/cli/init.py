@@ -9,9 +9,9 @@ from lintwin.core.config import (
 )
 from lintwin.core.constants import (
     BARE_REPO, LOCAL_CONFIG_PATH, SHARED_CONFIG_PATH,
-    DEFAULT_GIT_PATHS, DEFAULT_RSYNC_PATHS, NOISE_DOTFILES,
 )
 from lintwin.core import git as git_core
+from lintwin.cli.selector import run_selector
 
 console = Console()
 
@@ -24,34 +24,6 @@ def check_prerequisites() -> list[str]:
         if subprocess.run(["which", tool], capture_output=True).returncode != 0:
             missing.append(tool)
     return missing
-
-
-def discover_dotfiles(home: Path) -> list[Path]:
-    found = []
-    for item in sorted(home.iterdir()):
-        if item.name.startswith(".") and item.name not in NOISE_DOTFILES:
-            found.append(item)
-    return found
-
-
-def discover_rsync_dirs(home: Path) -> list[Path]:
-    defaults = {Path(p).expanduser().name for p in DEFAULT_RSYNC_PATHS}
-    found = []
-    for item in sorted(home.iterdir()):
-        if item.is_dir() and not item.name.startswith(".") and item.name not in defaults:
-            found.append(item)
-    return found
-
-
-def _interactive_checklist(title: str, items: list[Path], pre_checked: set[str]) -> list[str]:
-    console.print(f"\n[bold]{title}[/bold]")
-    selected = []
-    for item in items:
-        name = f"~/{item.relative_to(Path.home())}" if item.is_relative_to(Path.home()) else str(item)
-        default = item.name in pre_checked
-        if Confirm.ask(f"  Track {name}?", default=default):
-            selected.append(name)
-    return selected
 
 
 def _create_github_repo(name: str) -> str:
@@ -100,13 +72,7 @@ def _run_init(home: Path, machine_name: str | None = None) -> None:
     else:
         repo_url = Prompt.ask("SSH URL of existing repo")
 
-    dotfiles = discover_dotfiles(home)
-    default_names = {Path(p).expanduser().name for p in DEFAULT_GIT_PATHS}
-    git_paths = _interactive_checklist("Git-tracked dotfiles", dotfiles, default_names)
-
-    rsync_dirs = discover_rsync_dirs(home)
-    extra_rsync = _interactive_checklist("Rsync directories", rsync_dirs, set())
-    rsync_paths = list(DEFAULT_RSYNC_PATHS) + extra_rsync
+    git_paths, rsync_paths = run_selector(home)
 
     shared = SharedConfig(git_paths=git_paths, rsync_paths=rsync_paths)
     save_shared_config(shared, SHARED_CONFIG_PATH)
