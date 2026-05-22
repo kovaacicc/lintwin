@@ -57,6 +57,11 @@ def init_cmd(repo_url: str | None, machine_name: str | None, max_git_file_mb: in
     home = Path.home()
 
     if repo_url:
+        if max_git_file_mb != DEFAULT_MAX_GIT_FILE_MB:
+            console.print(
+                "[yellow]--max-git-file-mb is ignored with --join; "
+                "the threshold comes from the joined repo.[/yellow]"
+            )
         _run_join(repo_url, home, machine_name)
     else:
         _run_init(home, machine_name, max_git_file_mb)

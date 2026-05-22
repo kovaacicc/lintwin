@@ -54,3 +54,21 @@ def test_init_max_git_file_mb_defaults_to_25(monkeypatch) -> None:
     result = CliRunner().invoke(cli, ["init", "--name", "laptop"])
     assert result.exit_code == 0, result.output
     assert captured["shared"].max_git_file_mb == 25
+
+
+def test_init_join_warns_when_max_git_file_mb_passed(monkeypatch) -> None:
+    import lintwin.cli.init as init_mod
+    monkeypatch.setattr(init_mod, "check_prerequisites", lambda: [])
+    monkeypatch.setattr(init_mod, "save_local_config", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod, "load_shared_config",
+                        lambda *a, **k: init_mod.SharedConfig())
+    monkeypatch.setattr(init_mod.git_core, "init_bare_repo", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod.git_core, "set_remote", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod.git_core, "pull_fast_forward", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod.Confirm, "ask", lambda *a, **k: False)
+    result = CliRunner().invoke(cli, [
+        "init", "--join", "git@example.com:me/dots.git",
+        "--name", "desktop", "--max-git-file-mb", "50",
+    ])
+    assert result.exit_code == 0, result.output
+    assert "ignored with --join" in result.output
