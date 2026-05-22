@@ -60,3 +60,36 @@ def test_sync_shows_dirty_repos(monkeypatch) -> None:
     runner = CliRunner()
     result = runner.invoke(cli, ["sync", "--dry-run"], input="s\n")
     assert "foo" in result.output or "dirty" in result.output.lower()
+
+
+def test_apply_size_resolution_offload_to_rsync() -> None:
+    from lintwin.cli.sync import apply_size_resolution
+    from lintwin.core.config import SharedConfig
+    from lintwin.core.sizeguard import FlaggedItem
+    shared = SharedConfig(git_paths=[], rsync_paths=[], never_sync=[])
+    apply_size_resolution(shared, FlaggedItem("~/.config/big.bin", 99, False), "r")
+    assert "~/.config/big.bin" in shared.git_excludes
+    assert "~/.config/big.bin" in shared.rsync_paths
+    assert "~/.config/big.bin" not in shared.never_sync
+
+
+def test_apply_size_resolution_never_sync() -> None:
+    from lintwin.cli.sync import apply_size_resolution
+    from lintwin.core.config import SharedConfig
+    from lintwin.core.sizeguard import FlaggedItem
+    shared = SharedConfig(git_paths=[], rsync_paths=[], never_sync=[])
+    apply_size_resolution(shared, FlaggedItem("~/.config/big.bin", 99, False), "n")
+    assert "~/.config/big.bin" in shared.never_sync
+    assert "~/.config/big.bin" not in shared.git_excludes
+    assert "~/.config/big.bin" not in shared.rsync_paths
+
+
+def test_apply_size_resolution_commit_anyway_is_noop() -> None:
+    from lintwin.cli.sync import apply_size_resolution
+    from lintwin.core.config import SharedConfig
+    from lintwin.core.sizeguard import FlaggedItem
+    shared = SharedConfig(git_paths=[], rsync_paths=[], never_sync=[])
+    apply_size_resolution(shared, FlaggedItem("~/.config/big.bin", 99, False), "g")
+    assert shared.git_excludes == []
+    assert shared.never_sync == []
+    assert shared.rsync_paths == []

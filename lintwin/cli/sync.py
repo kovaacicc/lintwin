@@ -1,12 +1,18 @@
 import click
+from pathlib import Path
 from rich.console import Console
 from rich.table import Table
-from lintwin.core.config import LocalConfig, RemoteConfig, SharedConfig, load_local_config, load_shared_config
+from lintwin.core.config import (
+    LocalConfig, RemoteConfig, SharedConfig,
+    load_local_config, load_shared_config, save_shared_config,
+)
 from lintwin.core.scanner import scan_for_dirty_repos, DirtyRepo
 from lintwin.core.rsync import check_connectivity, fetch_remote_snapshot, detect_conflicts, build_excludes_file, rsync_path
 from lintwin.core.snapshot import load_snapshot, save_snapshot, build_file_snapshot, now_iso, RemoteSnapshot
 from lintwin.core import git as git_core
 from lintwin.core.constants import BARE_REPO, SNAPSHOT_FILE
+from lintwin.core.sizeguard import scan_oversized, FlaggedItem
+from lintwin.cli.selector import _fmt_size
 
 git_status_short = git_core.status_short
 
@@ -43,6 +49,58 @@ def _show_git_preview(changes: list[tuple[str, str]]) -> None:
         console.print(f"  [cyan]{code}[/cyan]  {path}")
 
 
+def apply_size_resolution(shared: SharedConfig, item: FlaggedItem, choice: str) -> None:
+    """Mutate shared config for one guard resolution. 'g' (commit anyway) is a no-op."""
+    if choice == "r":
+        if item.path not in shared.git_excludes:
+            shared.git_excludes.append(item.path)
+        if item.path not in shared.rsync_paths:
+            shared.rsync_paths.append(item.path)
+    elif choice == "n":
+        if item.path not in shared.never_sync:
+            shared.never_sync.append(item.path)
+
+
+def _run_size_guard(shared: SharedConfig, dry_run: bool) -> bool:
+    """Scan git paths for oversized new items. Returns False if the user aborts."""
+    threshold = shared.max_git_file_mb * 1024 * 1024
+    flagged = scan_oversized(
+        shared.git_paths,
+        shared.never_sync + shared.git_excludes,
+        threshold,
+        BARE_REPO,
+        Path.home(),
+    )
+    if not flagged:
+        return True
+    console.print(
+        f"\n[yellow]⚠ Large items would be committed to git "
+        f"(limit {shared.max_git_file_mb} MB):[/yellow]"
+    )
+    if dry_run:
+        for item in flagged:
+            kind = "dir " if item.is_dir else "file"
+            console.print(f"  [{kind}] {item.path}  {_fmt_size(item.size)}")
+        console.print("[dim]--dry-run: no prompts, no changes.[/dim]")
+        return True
+    changed = False
+    for item in flagged:
+        console.print(f"\n  [cyan]{item.path}[/cyan]  {_fmt_size(item.size)}")
+        choice = click.prompt(
+            "  [r] offload to rsync  [n] never-sync  [g] commit to git anyway  [a] abort sync",
+            default="r",
+        ).strip().lower()
+        if choice == "a":
+            console.print("Aborted.")
+            return False
+        if choice in ("r", "n"):
+            apply_size_resolution(shared, item, choice)
+            changed = True
+    if changed:
+        save_shared_config(shared)
+    return True
+
+
 @click.command("sync")
 @click.option("--to", "remote_name", default=None, help="Target remote (required when 2+ remotes configured)")
 @click.option("--dry-run", is_flag=True, help="Preview only, no changes applied")
@@ -75,6 +133,9 @@ def sync_cmd(remote_name: str | None, dry_run: bool) -> None:
     git_changes = git_status_short(shared.git_paths)
     _show_git_preview(git_changes)
 
+    if not _run_size_guard(shared, dry_run):
+        return
+
     reachable = check_connectivity(remote)
 
     if dry_run:
@@ -103,7 +164,10 @@ def _do_git_sync(shared: SharedConfig, machine_name: str, remote_name: str) -> N
     if ahead == 0 and behind == 0:
         console.print("  Already up to date.")
     elif ahead > 0 and behind == 0:
-        git_core.stage_paths(shared.git_paths, BARE_REPO)
+        git_core.stage_paths(
+            shared.git_paths, BARE_REPO,
+            excludes=shared.never_sync + shared.git_excludes,
+        )
         msg = f"lintwin: sync from {machine_name} @ {now_iso()}"
         git_core.commit(msg, BARE_REPO)
         git_core.push("main", BARE_REPO)
