@@ -58,6 +58,17 @@ def test_excluded_item_not_flagged(repo_home) -> None:
     assert flagged == []
 
 
+def test_results_sorted_largest_first(repo_home) -> None:
+    repo, home = repo_home
+    _make(home / ".config" / "small.bin", 1500)
+    _make(home / ".config" / "large.bin", 4000)
+    _make(home / ".config" / "medium.bin", 2500)
+    flagged = scan_oversized([str(home / ".config")], [], 1024, repo, home)
+    sizes = [f.size for f in flagged]
+    assert sizes == sorted(sizes, reverse=True)
+    assert flagged[0].path == "~/.config/large.bin"
+
+
 def test_directory_with_tracked_file_not_flagged_as_dir(repo_home) -> None:
     repo, home = repo_home
     mixed = home / ".config" / "mixed"
