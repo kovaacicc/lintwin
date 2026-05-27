@@ -48,7 +48,7 @@ def pull_cmd(remote_name: str | None) -> None:
                 console.print(f"  {c.path}")
             return
 
-    excludes = build_excludes_file(shared.never_sync)
     for path in shared.rsync_paths:
+        excludes = build_excludes_file(shared.never_sync, path)
         rsync_path(path, remote, direction="pull", excludes_file=excludes)
     console.print("[green]Pull complete.[/green]")

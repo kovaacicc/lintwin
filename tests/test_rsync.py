@@ -72,12 +72,55 @@ def test_detect_conflicts_one_side_only() -> None:
     assert conflicts == []
 
 
-def test_build_excludes_file(tmp_path: Path) -> None:
-    patterns = ["~/.cache", "*.gpg"]
-    excludes = build_excludes_file(patterns)
+def test_build_excludes_file_bare_glob_kept_for_any_source() -> None:
+    """Patterns with no '/' (bare globs) match anywhere in the tree and are always kept."""
+    excludes = build_excludes_file(["*.gpg"], "~/Documents")
     content = Path(excludes).read_text()
-    assert "~/.cache" in content
     assert "*.gpg" in content
+
+
+def test_build_excludes_file_drops_path_outside_source() -> None:
+    """Path patterns that don't live under the source root are dropped."""
+    excludes = build_excludes_file(["~/.ssh/id_*"], "~/Documents")
+    content = Path(excludes).read_text()
+    assert content.strip() == ""
+
+
+def test_build_excludes_file_translates_path_inside_home_root() -> None:
+    """~/.cache syncing from ~ becomes /.cache (rsync-relative, no tilde)."""
+    excludes = build_excludes_file(["~/.cache"], "~")
+    content = Path(excludes).read_text()
+    assert "/.cache" in content
+    assert "~" not in content
+
+
+def test_build_excludes_file_translates_glob_inside_home_root() -> None:
+    """~/.ssh/id_* syncing from ~ becomes /.ssh/id_* (rsync-relative, no tilde)."""
+    excludes = build_excludes_file(["~/.ssh/id_*"], "~")
+    content = Path(excludes).read_text()
+    assert "/.ssh/id_*" in content
+    assert "~" not in content
+
+
+def test_build_excludes_file_acceptance_documents_source() -> None:
+    """
+    Acceptance criterion: source=~/Documents keeps *.gpg but drops ~/.ssh/id_*.
+    """
+    excludes = build_excludes_file(["~/.ssh/id_*", "*.gpg"], "~/Documents")
+    content = Path(excludes).read_text()
+    assert "*.gpg" in content
+    assert ".ssh" not in content
+
+
+def test_build_excludes_file_acceptance_home_source() -> None:
+    """
+    Acceptance criterion: source=~ includes both patterns in rsync-understandable form.
+    """
+    excludes = build_excludes_file(["~/.ssh/id_*", "*.gpg"], "~")
+    content = Path(excludes).read_text()
+    assert "*.gpg" in content
+    assert "/.ssh/id_*" in content
+    assert "~" not in content
 
 
 def test_is_binary_text_file(tmp_path: Path) -> None:

@@ -254,6 +254,8 @@ patterns = [
 
 **Never synced:** SSH private keys (`~/.ssh/id_*`), caches, GPG keys, `~/.config/lintwin/config.toml` (machine-local, holds hostnames/IPs), and anything matching `[never_sync]` patterns.
 
+`[never_sync]` patterns come in two forms: bare globs like `*.gpg` (no path separator) match any file with that name anywhere under any rsync source. Path patterns like `~/.ssh/id_*` are expanded and matched relative to each rsync source root — a pattern outside a source root is silently dropped for that source, so syncing `~/Documents` never picks up `~/.ssh/id_*`.
+
 **Project repos** (`~/projects/`): lintwin does not touch their contents. It scans for uncommitted or unpushed changes and warns you before sync so you don't lose work.
 
 ## Credits

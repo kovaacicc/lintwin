@@ -88,10 +88,43 @@ def _is_binary(path: str) -> bool:
         return True
 
 
-def build_excludes_file(patterns: list[str]) -> str:
+def _translate_pattern(pattern: str, source_path: str) -> str | None:
+    """
+    Translate a never_sync pattern into an rsync exclude relative to source_path.
+
+    Bare patterns (no '/') match anywhere in the tree and are returned unchanged.
+    Path patterns are expanded from '~', checked against source_path, and rewritten
+    as '/<relative>' so rsync anchors them to the transfer root. Patterns that don't
+    fall under source_path are dropped (return None).
+    """
+    if "/" not in pattern:
+        return pattern
+
+    home = str(Path.home())
+    abs_pattern = pattern.replace("~", home, 1) if pattern.startswith("~") else pattern
+    abs_source = str(Path(source_path).expanduser())
+
+    # Find the non-glob directory prefix to check containment
+    glob_chars = set("*?[")
+    first_glob = next((i for i, c in enumerate(abs_pattern) if c in glob_chars), len(abs_pattern))
+    non_glob = abs_pattern[:first_glob]
+    prefix_dir = str(Path(non_glob).parent)
+
+    try:
+        Path(prefix_dir).relative_to(abs_source)
+    except ValueError:
+        return None
+
+    rel = abs_pattern[len(abs_source):].lstrip("/")
+    return f"/{rel}"
+
+
+def build_excludes_file(patterns: list[str], source_path: str) -> str:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".excludes", delete=False) as f:
         for pattern in patterns:
-            f.write(f"{pattern}\n")
+            translated = _translate_pattern(pattern, source_path)
+            if translated is not None:
+                f.write(f"{translated}\n")
         return f.name
 
 

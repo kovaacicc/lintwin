@@ -32,8 +32,8 @@ def diff_cmd(remote_name: str | None) -> None:
         return
 
     console.print(f"\n[bold]Rsync diff vs {remote_name_resolved}:[/bold]")
-    excludes = build_excludes_file(shared.never_sync)
     for path in shared.rsync_paths:
+        excludes = build_excludes_file(shared.never_sync, path)
         expanded = str(Path(path).expanduser())
         remote_path = f"{remote.ssh_user}@{remote.host}:{expanded}/"
         result = subprocess.run(

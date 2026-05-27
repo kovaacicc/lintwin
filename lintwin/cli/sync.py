@@ -207,11 +207,11 @@ def _do_rsync_sync(
         for conflict in conflicts:
             _resolve_conflict(conflict, remote, remote_name)
 
-    excludes = build_excludes_file(shared.never_sync)
     for path in shared.rsync_paths:
         if any(path.startswith(skip) or str(path) == skip for skip in skip_paths):
             console.print(f"  [dim]Skipping {path} (dirty repo)[/dim]")
             continue
+        excludes = build_excludes_file(shared.never_sync, path)
         result = rsync_path(path, remote, direction="push", excludes_file=excludes)
         if result.returncode == 0:
             console.print(f"  [green]✓[/green] {path}")
