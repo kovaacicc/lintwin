@@ -85,14 +85,27 @@ def stage_paths(
     if not existing:
         return
     wt = (Path.home() if work_tree is None else Path(work_tree).expanduser()).resolve()
+    _GLOB_CHARS = frozenset("*?[")
+
+    def _has_glob(s: str) -> bool:
+        return any(c in s for c in _GLOB_CHARS)
+
     pathspecs = list(existing)
     for entry in excludes or []:
         resolved = Path(entry).expanduser()
         try:
             rel = resolved.relative_to(wt)
         except ValueError:
-            continue  # not under the work tree (e.g. a bare glob) — git can't exclude it here
-        pathspecs.append(f":(exclude){rel}")
+            # Not under the work tree — only handle if it's a bare glob pattern
+            if _has_glob(entry):
+                # e.g. "*.gpg" → match anywhere in the tree
+                pathspecs.append(f":(exclude,glob)**/{entry}")
+            # else: absolute path outside work tree — silently ignore
+            continue
+        if _has_glob(str(rel)):
+            pathspecs.append(f":(exclude,glob){rel}")
+        else:
+            pathspecs.append(f":(exclude){rel}")
     _git("add", "--", *pathspecs, bare_repo=bare_repo, work_tree=work_tree)
 
 

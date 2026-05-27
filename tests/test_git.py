@@ -129,3 +129,65 @@ def test_stage_paths_excludes_nested_config_toml(bare_repo) -> None:
     tracked = list_tracked_files(bare_repo=repo, work_tree=work)
     assert str(lintwin_dir / "shared.toml") in tracked
     assert str(lintwin_dir / "config.toml") not in tracked
+
+
+def test_stage_paths_bare_glob_excludes_matching_files(bare_repo) -> None:
+    """Bare glob like '*.gpg' excludes matching files anywhere in the tracked tree."""
+    repo, work = bare_repo
+    subdir = work / "keys"
+    subdir.mkdir()
+    (subdir / "secret.gpg").write_text("secret key material")
+    (subdir / "pubkey.txt").write_text("public")
+
+    stage_paths(
+        [str(subdir)],
+        bare_repo=repo, work_tree=work,
+        excludes=["*.gpg"],
+    )
+    commit("add keys dir", bare_repo=repo, work_tree=work)
+    tracked = list_tracked_files(bare_repo=repo, work_tree=work)
+    assert str(subdir / "pubkey.txt") in tracked
+    assert str(subdir / "secret.gpg") not in tracked
+
+
+def test_stage_paths_home_relative_glob_excludes_deep_matches(bare_repo) -> None:
+    """A glob like '<wt>/.config/**/*.secret' excludes files at any depth."""
+    repo, work = bare_repo
+    app_dir = work / ".config" / "myapp"
+    app_dir.mkdir(parents=True)
+    (app_dir / "api.secret").write_text("secret token")
+    (app_dir / "settings.conf").write_text("safe config")
+
+    # Simulate how DEFAULT_NEVER_SYNC entries like "~/.config/**/*.secret" resolve
+    # after expanduser() when the work tree is the home directory.
+    glob_exclude = str(work / ".config" / "**" / "*.secret")
+    stage_paths(
+        [str(work / ".config")],
+        bare_repo=repo, work_tree=work,
+        excludes=[glob_exclude],
+    )
+    commit("add dotconfig", bare_repo=repo, work_tree=work)
+    tracked = list_tracked_files(bare_repo=repo, work_tree=work)
+    assert str(app_dir / "settings.conf") in tracked
+    assert str(app_dir / "api.secret") not in tracked
+
+
+def test_stage_paths_gpg_files_not_committed_with_default_never_sync(bare_repo) -> None:
+    """Integration: staging a dir containing .gpg files with DEFAULT_NEVER_SYNC excludes them."""
+    from lintwin.core.constants import DEFAULT_NEVER_SYNC
+
+    repo, work = bare_repo
+    dot_local = work / ".local" / "share" / "app"
+    dot_local.mkdir(parents=True)
+    (dot_local / "keyring.gpg").write_text("encrypted data")
+    (dot_local / "data.json").write_text("{}")
+
+    stage_paths(
+        [str(work / ".local")],
+        bare_repo=repo, work_tree=work,
+        excludes=DEFAULT_NEVER_SYNC,
+    )
+    commit("add local data", bare_repo=repo, work_tree=work)
+    tracked = list_tracked_files(bare_repo=repo, work_tree=work)
+    assert str(dot_local / "data.json") in tracked
+    assert str(dot_local / "keyring.gpg") not in tracked
