@@ -298,3 +298,103 @@ def test_fmt_size_megabytes() -> None:
 
 def test_fmt_size_gigabytes() -> None:
     assert fmt_size(1024 ** 3) == "1.0 GB"
+
+
+# ── Unlimited depth / parent / NOISE_CHILDREN ────────────────────────────────
+
+def test_selector_node_has_parent_field() -> None:
+    node = SelectorNode(path=Path("/tmp/x"))
+    assert node.parent is None
+
+
+def test_load_children_sets_parent_refs(tmp_path: Path) -> None:
+    parent_dir = tmp_path / ".config"
+    parent_dir.mkdir()
+    (parent_dir / "nvim").mkdir()
+    node = SelectorNode(path=parent_dir, mode="git", size=0)
+    _load_children(node, home=tmp_path)
+    assert len(node.children) == 1
+    assert node.children[0].parent is node
+
+
+def test_load_children_filters_noise_children(tmp_path: Path) -> None:
+    local_dir = tmp_path / ".local"
+    local_dir.mkdir()
+    (local_dir / "bin").mkdir()
+    (local_dir / "lib").mkdir()      # NOISE_CHILDREN[".local"]
+    (local_dir / "include").mkdir()  # NOISE_CHILDREN[".local"]
+    node = SelectorNode(path=local_dir, mode="skip", size=0)
+    _load_children(node, home=tmp_path)
+    names = [c.path.name for c in node.children]
+    assert "bin" in names
+    assert "lib" not in names
+    assert "include" not in names
+
+
+def test_load_children_filters_noise_children_share(tmp_path: Path) -> None:
+    share_dir = tmp_path / ".local" / "share"
+    share_dir.mkdir(parents=True)
+    (share_dir / "nvim").mkdir()
+    (share_dir / "baloo").mkdir()  # NOISE_CHILDREN[".local/share"]
+    (share_dir / "go").mkdir()     # NOISE_CHILDREN[".local/share"]
+    node = SelectorNode(path=share_dir, mode="skip", size=0)
+    _load_children(node, home=tmp_path)
+    names = [c.path.name for c in node.children]
+    assert "nvim" in names
+    assert "baloo" not in names
+    assert "go" not in names
+
+
+def test_flatten_recurses_to_depth_2() -> None:
+    grandchild = SelectorNode(path=Path("/tmp/x/a/1"))
+    child = SelectorNode(path=Path("/tmp/x/a"))
+    child.children = [grandchild]
+    child.children_loaded = True
+    child.expanded = True
+
+    parent = SelectorNode(path=Path("/tmp/x"))
+    parent.children = [child]
+    parent.children_loaded = True
+    parent.expanded = True
+
+    flat = _flatten([parent])
+    assert len(flat) == 3
+    depths = [d for _, d, _ in flat]
+    assert depths == [0, 1, 2]
+
+
+def test_compute_totals_recurses_grandchildren() -> None:
+    grandchild = SelectorNode(path=Path("/tmp/x/a/1"), mode="git", size=50)
+    child = SelectorNode(path=Path("/tmp/x/a"), mode="git", size=200)
+    child.children = [grandchild]
+    child.children_loaded = True
+
+    parent = SelectorNode(path=Path("/tmp/x"), mode="git", size=1000)
+    parent.children = [child]
+    parent.children_loaded = True
+
+    git_b, rsync_b = _compute_totals([parent])
+    assert git_b == 50  # only grandchild leaf, not child (200) or parent (1000)
+    assert rsync_b == 0
+
+
+def test_derive_paths_recurses_grandchildren(tmp_path: Path) -> None:
+    home = tmp_path
+    local = home / ".local"
+    share = local / "share"
+    share.mkdir(parents=True)
+
+    share_node = SelectorNode(path=share, mode="skip", size=0)
+    share_node.children = [
+        SelectorNode(path=share / "nvim", mode="git", size=0),
+        SelectorNode(path=share / "icons", mode="rsync", size=0),
+    ]
+    share_node.children_loaded = True
+
+    local_node = SelectorNode(path=local, mode="skip", size=0)
+    local_node.children = [share_node]
+    local_node.children_loaded = True
+
+    git, rsync = _derive_paths([local_node], home)
+    assert "~/.local/share/nvim" in git
+    assert "~/.local/share/icons" in rsync

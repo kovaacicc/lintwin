@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from lintwin.core.constants import DEFAULT_GIT_PATHS, DEFAULT_RSYNC_PATHS, NOISE_DOTFILES
+from lintwin.core.constants import DEFAULT_GIT_PATHS, DEFAULT_RSYNC_PATHS, NOISE_CHILDREN, NOISE_DOTFILES
 from lintwin.cli.format import fmt_size
 
 Mode = Literal["skip", "git", "rsync"]
@@ -21,6 +21,7 @@ class SelectorNode:
     children: list[SelectorNode] = field(default_factory=list)
     expanded: bool = False
     children_loaded: bool = False
+    parent: SelectorNode | None = None
 
 
 def _get_size(path: Path) -> int:
@@ -66,17 +67,27 @@ def _scan_home(home: Path) -> list[SelectorNode]:
     return nodes
 
 
-def _load_children(node: SelectorNode) -> None:
+def _load_children(node: SelectorNode, home: Path | None = None) -> None:
     if node.children_loaded:
         return
+    if home is None:
+        home = Path.home()
+    try:
+        key = str(node.path.relative_to(home))
+        noise = NOISE_CHILDREN.get(key, set())
+    except ValueError:
+        noise = set()
     try:
         children_paths = sorted(node.path.iterdir())
     except PermissionError:
         node.children_loaded = True
         return
     for item in children_paths:
+        if item.name in noise:
+            continue
         size = _get_size(item)
-        node.children.append(SelectorNode(path=item, mode=node.mode, size=size))
+        child = SelectorNode(path=item, mode=node.mode, size=size, parent=node)
+        node.children.append(child)
     node.children_loaded = True
 
 
@@ -105,23 +116,54 @@ def _cycle_mode(node: SelectorNode) -> None:
             child.mode = next_mode
 
 
+def _leaf_bytes(node: SelectorNode) -> tuple[int, int]:
+    if not node.children_loaded or not node.children:
+        git = node.size if node.mode == "git" else 0
+        rsync = node.size if node.mode == "rsync" else 0
+        return git, rsync
+    git, rsync = 0, 0
+    for child in node.children:
+        g, r = _leaf_bytes(child)
+        git += g
+        rsync += r
+    return git, rsync
+
+
 def _compute_totals(nodes: list[SelectorNode]) -> tuple[int, int]:
-    # nodes must be the top-level list only — never a recursive walk
-    git_bytes = 0
-    rsync_bytes = 0
+    git_bytes, rsync_bytes = 0, 0
     for node in nodes:
-        if node.children_loaded:
-            for child in node.children:
-                if child.mode == "git":
-                    git_bytes += child.size
-                elif child.mode == "rsync":
-                    rsync_bytes += child.size
-        else:
-            if node.mode == "git":
-                git_bytes += node.size
-            elif node.mode == "rsync":
-                rsync_bytes += node.size
+        g, r = _leaf_bytes(node)
+        git_bytes += g
+        rsync_bytes += r
     return git_bytes, rsync_bytes
+
+
+def _collect_paths(
+    node: SelectorNode,
+    home: Path,
+    git_paths: list[str],
+    rsync_paths: list[str],
+) -> None:
+    rel = f"~/{node.path.relative_to(home)}"
+    if not node.children_loaded or not node.children:
+        if node.mode == "git":
+            git_paths.append(rel)
+        elif node.mode == "rsync":
+            rsync_paths.append(rel)
+        return
+    # Collapse to parent only when every child is a leaf with the same mode.
+    # If any child has loaded sub-children, we must recurse to get accurate paths.
+    all_leaves = all(not c.children_loaded or not c.children for c in node.children)
+    child_modes = {c.mode for c in node.children}
+    if all_leaves and len(child_modes) <= 1:
+        mode = child_modes.pop() if child_modes else "skip"
+        if mode == "git":
+            git_paths.append(rel)
+        elif mode == "rsync":
+            rsync_paths.append(rel)
+    else:
+        for child in node.children:
+            _collect_paths(child, home, git_paths, rsync_paths)
 
 
 def _derive_paths(
@@ -131,43 +173,21 @@ def _derive_paths(
         home = Path.home()
     git_paths: list[str] = []
     rsync_paths: list[str] = []
-
     for node in nodes:
-        rel = f"~/{node.path.relative_to(home)}"
-        if not node.children_loaded:
-            if node.mode == "git":
-                git_paths.append(rel)
-            elif node.mode == "rsync":
-                rsync_paths.append(rel)
-        else:
-            child_modes = {c.mode for c in node.children}
-            if len(child_modes) <= 1:
-                mode = child_modes.pop() if child_modes else "skip"
-                if mode == "git":
-                    git_paths.append(rel)
-                elif mode == "rsync":
-                    rsync_paths.append(rel)
-            else:
-                for child in node.children:
-                    child_rel = f"~/{child.path.relative_to(home)}"
-                    if child.mode == "git":
-                        git_paths.append(child_rel)
-                    elif child.mode == "rsync":
-                        rsync_paths.append(child_rel)
-
+        _collect_paths(node, home, git_paths, rsync_paths)
     return git_paths, rsync_paths
 
 
 def _flatten(
     nodes: list[SelectorNode],
+    _depth: int = 0,
 ) -> list[tuple[SelectorNode, int, bool]]:
     flat: list[tuple[SelectorNode, int, bool]] = []
-    for node in nodes:
-        flat.append((node, 0, False))
+    for i, node in enumerate(nodes):
+        is_last = i == len(nodes) - 1
+        flat.append((node, _depth, is_last))
         if node.expanded and node.children_loaded:
-            for i, child in enumerate(node.children):
-                is_last = i == len(node.children) - 1
-                flat.append((child, 1, is_last))
+            flat.extend(_flatten(node.children, _depth + 1))
     return flat
 
 
@@ -183,6 +203,8 @@ def _render(
     flat: list[tuple[SelectorNode, int, bool]],
     cursor: int,
     nodes: list[SelectorNode],
+    scroll_offset: int = 0,
+    max_visible: int | None = None,
 ) -> "Text":
     from rich.text import Text
 
@@ -197,13 +219,18 @@ def _render(
     totals.append("  " + "─" * 38, style="dim")
     lines.append(totals)
 
-    for i, (node, depth, is_last) in enumerate(flat):
-        selected = i == cursor
+    visible = flat[scroll_offset:scroll_offset + max_visible] if max_visible else flat
+    for i, (node, depth, is_last) in enumerate(visible):
+        actual_i = i + scroll_offset
+        selected = actual_i == cursor
         line = Text()
 
         line.append("▶ " if selected else "  ", style="bold cyan" if selected else "")
 
-        if depth == 1:
+        if depth == 0:
+            pass
+        else:
+            line.append("  │ " * (depth - 1), style="dim")
             line.append("└ " if is_last else "├ ", style="dim")
 
         display = _node_display_mode(node)
@@ -215,6 +242,12 @@ def _render(
         line.append(fmt_size(node.size), style="dim")
 
         lines.append(line)
+
+    # scroll position indicator
+    if max_visible and len(flat) > max_visible:
+        pct = int(100 * (scroll_offset + max_visible / 2) / len(flat))
+        scroll_info = Text(f"  [{scroll_offset + 1}–{min(scroll_offset + max_visible, len(flat))}/{len(flat)}  {pct}%]", style="dim")
+        lines.append(scroll_info)
 
     footer = Text(
         "\n  ↑↓ navigate  ·  space cycle  ·  → expand  ·  ← collapse  ·  enter confirm  ·  q cancel",
@@ -240,16 +273,31 @@ def run_selector(home: Path) -> tuple[list[str], list[str]]:
     nodes = _scan_home(home)
 
     cursor = 0
+    scroll_offset = 0
     flat = _flatten(nodes)
 
+    # reserve lines for: totals header (1) + scroll indicator (1) + footer (2)
+    OVERHEAD = 4
+
+    def _clamp_scroll(cursor: int, scroll_offset: int, max_visible: int) -> int:
+        if cursor < scroll_offset:
+            return cursor
+        if cursor >= scroll_offset + max_visible:
+            return cursor - max_visible + 1
+        return scroll_offset
+
+    def _max_visible() -> int:
+        return max(1, console.size.height - OVERHEAD)
+
     with Live(
-        _render(flat, cursor, nodes),
+        _render(flat, cursor, nodes, scroll_offset, _max_visible()),
         console=console,
         refresh_per_second=30,
         screen=False,
     ) as live:
         while True:
             key = readchar.readkey()
+            mv = _max_visible()
 
             if key == readchar.key.UP:
                 cursor = max(0, cursor - 1)
@@ -262,25 +310,21 @@ def run_selector(home: Path) -> tuple[list[str], list[str]]:
                 _cycle_mode(node)
 
             elif key == readchar.key.RIGHT:
-                node, depth, _last = flat[cursor]
-                if depth == 0 and node.path.is_dir():
-                    _load_children(node)
+                node, _depth, _last = flat[cursor]
+                if node.path.is_dir():
+                    _load_children(node, home)
                     node.expanded = True
                     flat = _flatten(nodes)
 
             elif key == readchar.key.LEFT:
                 node, depth, _last = flat[cursor]
-                if depth == 1:
-                    parent_idx = next(
-                        i for i in range(cursor - 1, -1, -1)
-                        if flat[i][1] == 0
-                    )
-                    flat[parent_idx][0].expanded = False
-                    flat = _flatten(nodes)
-                    cursor = parent_idx
-                elif node.expanded:
+                if node.expanded:
                     node.expanded = False
                     flat = _flatten(nodes)
+                elif node.parent is not None:
+                    node.parent.expanded = False
+                    flat = _flatten(nodes)
+                    cursor = next(i for i, (n, _, _) in enumerate(flat) if n is node.parent)
 
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 return _derive_paths(nodes, home)
@@ -290,4 +334,5 @@ def run_selector(home: Path) -> tuple[list[str], list[str]]:
                 raise SystemExit(0)
 
             cursor = min(cursor, len(flat) - 1)
-            live.update(_render(flat, cursor, nodes))
+            scroll_offset = _clamp_scroll(cursor, scroll_offset, mv)
+            live.update(_render(flat, cursor, nodes, scroll_offset, mv))

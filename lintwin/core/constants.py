@@ -38,6 +38,22 @@ DEFAULT_NEVER_SYNC: list[str] = [
 DEFAULT_MAX_GIT_FILE_MB: int = 25
 
 NOISE_DOTFILES: set[str] = {
-    ".cache", ".gnupg", ".mozilla", ".thunderbird", ".dbus",
-    ".local", ".var", ".pki",
+    ".cache", ".gnupg", ".thunderbird", ".dbus",
+}
+
+# Maps a parent directory name (or relative path segment) to child names that
+# should be silently hidden when that directory is expanded in the selector.
+# ".local/share" is keyed by two path components because its noise set differs
+# from ".local" itself.
+NOISE_CHILDREN: dict[str, set[str]] = {
+    ".local": {"lib", "include"},
+    ".local/share": {
+        "baloo",
+        "go",
+        "Trash",
+        "recently-used.xbel",
+        "xorg",
+        "flatpak",
+        "lintwin",
+    },
 }
