@@ -110,3 +110,22 @@ def test_stage_paths_exclude_outside_work_tree_is_ignored(bare_repo, tmp_path: P
     commit("add inside", bare_repo=repo, work_tree=work)
     tracked = list_tracked_files(bare_repo=repo, work_tree=work)
     assert str(work / "inside.txt") in tracked
+
+
+def test_stage_paths_excludes_nested_config_toml(bare_repo) -> None:
+    """config.toml (machine-local) is not staged when .config is tracked."""
+    repo, work = bare_repo
+    lintwin_dir = work / ".config" / "lintwin"
+    lintwin_dir.mkdir(parents=True)
+    (lintwin_dir / "config.toml").write_text("machine-local")
+    (lintwin_dir / "shared.toml").write_text("shared")
+
+    stage_paths(
+        [str(work / ".config")],
+        bare_repo=repo, work_tree=work,
+        excludes=[str(lintwin_dir / "config.toml")],
+    )
+    commit("add dotconfig", bare_repo=repo, work_tree=work)
+    tracked = list_tracked_files(bare_repo=repo, work_tree=work)
+    assert str(lintwin_dir / "shared.toml") in tracked
+    assert str(lintwin_dir / "config.toml") not in tracked

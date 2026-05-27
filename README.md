@@ -252,7 +252,7 @@ patterns = [
 
 **rsync:** directories listed in `[rsync_paths]`. Transferred directly over SSH — requires both machines to be reachable (LAN or Tailscale).
 
-**Never synced:** SSH private keys (`~/.ssh/id_*`), caches, GPG keys, and anything matching `[never_sync]` patterns.
+**Never synced:** SSH private keys (`~/.ssh/id_*`), caches, GPG keys, `~/.config/lintwin/config.toml` (machine-local, holds hostnames/IPs), and anything matching `[never_sync]` patterns.
 
 **Project repos** (`~/projects/`): lintwin does not touch their contents. It scans for uncommitted or unpushed changes and warns you before sync so you don't lose work.
 
