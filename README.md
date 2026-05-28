@@ -196,6 +196,8 @@ lintwin packages diff --to <remote>         show packages missing between machin
 lintwin packages install                    install packages missing locally
 ```
 
+**Always run `lintwin sync` from the machine with the newer content.** `sync` pushes your local changes to the remote and treats your machine as the source of truth. If you've been working on laptop, run `sync` from laptop. When you switch machines, run `lintwin pull` on the new machine first to catch up before you start working.
+
 ## Config files
 
 | File | Purpose |
@@ -288,7 +290,13 @@ lintwin track /etc/something --via rsync
 The remote is offline or not on the same network. Run `lintwin pull --to <remote>` to pull git-only changes, or wait until both machines are on the same network / Tailscale.
 
 **Conflict detected on sync**
-lintwin prompts you: keep local, keep remote, skip, or show diff (text files only). Conflicts only appear when the same file was modified on both machines since the last sync.
+A conflict means the same file was modified on both machines since the last sync. lintwin prompts you per file:
+- **Keep local** — your version is pushed to the remote (default push behavior)
+- **Keep remote** — your local copy is overwritten with the remote version
+- **Skip** — the file is left unchanged on both sides for now
+- **Show diff** — view the diff first, then choose (text files only)
+
+If lintwin detects that the remote machine has synced more recently than your last sync with it, it will warn you and ask whether to proceed. Answer N and run `lintwin pull` first if you think the remote has content you haven't seen.
 
 **`lintwin packages diff` shows everything as missing**
 Run `lintwin packages export` on both machines first to generate the package snapshots.
