@@ -175,6 +175,8 @@ lintwin track ~/Documents --via rsync        # track with rsync
 lintwin untrack ~/.config/nvim               # stop tracking
 ```
 
+Paths matching any `[never_sync]` pattern (e.g. `~/.ssh/id_*`, `*.gpg`, `~/.config/lintwin/config.toml`) are rejected by `track` with an error. To override, remove the pattern from the `[never_sync]` section in `shared.toml` first.
+
 ## Package management
 
 ```bash

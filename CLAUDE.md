@@ -27,11 +27,11 @@ pyproject.toml  entry point: lintwin.cli.main:cli
 - `~/.config/lintwin/config.toml`    — local machine name + remotes (never committed)
 - `~/.config/lintwin/shared.toml`    — tracked paths (committed to git remote)
 - `~/.local/share/lintwin/repo/`     — bare git repo
-- `~/.local/share/lintwin/packages/` — exported package lists
+- `~/.config/lintwin/packages/<machine>/` — exported package lists (git-tracked, one dir per machine)
 - `~/.local/share/lintwin/last_sync.json` — rsync snapshot for conflict detection
 
 ## Implementation status
-All planned tasks complete. 151/151 tests passing.
+All planned tasks complete. 161/161 tests passing.
 Commands: init, sync, status, pull, diff, track, untrack, packages (export/diff/install), remote (add/list/remove/edit)
 `lintwin init` uses an interactive arrow-key selector (`cli/selector.py`, built on `rich.Live`
 + `readchar`) to assign home-directory items to git/rsync/skip with live size totals.
