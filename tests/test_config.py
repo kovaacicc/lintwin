@@ -6,6 +6,7 @@ from lintwin.core.config import (
     load_local_config, save_local_config,
     load_shared_config, save_shared_config,
     track_path, untrack_path,
+    add_machine_exclude, remove_machine_exclude,
 )
 
 
@@ -119,3 +120,69 @@ def test_shared_config_defaults_when_size_guard_sections_absent(tmp_path: Path) 
     loaded = load_shared_config(cfg_path)
     assert loaded.git_excludes == []
     assert loaded.max_git_file_mb == 25
+
+
+# --- per_machine tests ---
+
+def test_load_shared_config_with_per_machine(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    cfg_file.write_text(
+        '[per_machine.laptop]\nexcludes = ["~/.config/kwinrc", "~/.config/monitors.xml"]\n'
+        '[per_machine.desktop]\nexcludes = ["~/.config/monitors.xml"]\n'
+    )
+    cfg = load_shared_config(cfg_file)
+    assert cfg.per_machine == {
+        "laptop": ["~/.config/kwinrc", "~/.config/monitors.xml"],
+        "desktop": ["~/.config/monitors.xml"],
+    }
+
+
+def test_load_shared_config_per_machine_missing(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    cfg_file.write_text("")
+    cfg = load_shared_config(cfg_file)
+    assert cfg.per_machine == {}
+
+
+def test_save_shared_config_round_trips_per_machine(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    original = SharedConfig(
+        per_machine={"laptop": ["~/.config/kwinrc"], "desktop": ["~/.config/monitors.xml"]}
+    )
+    save_shared_config(original, cfg_file)
+    loaded = load_shared_config(cfg_file)
+    assert loaded.per_machine == original.per_machine
+
+
+def test_add_machine_exclude(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    cfg_file.write_text("")
+    add_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    cfg = load_shared_config(cfg_file)
+    assert "~/.config/kwinrc" in cfg.per_machine["laptop"]
+
+
+def test_add_machine_exclude_no_duplicate(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    cfg_file.write_text("")
+    add_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    add_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    cfg = load_shared_config(cfg_file)
+    assert cfg.per_machine["laptop"].count("~/.config/kwinrc") == 1
+
+
+def test_remove_machine_exclude_found(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    cfg_file.write_text("")
+    add_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    result = remove_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    assert result is True
+    cfg = load_shared_config(cfg_file)
+    assert "~/.config/kwinrc" not in cfg.per_machine.get("laptop", [])
+
+
+def test_remove_machine_exclude_not_found(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    cfg_file.write_text("")
+    result = remove_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    assert result is False

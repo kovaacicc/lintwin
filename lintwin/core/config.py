@@ -30,6 +30,7 @@ class SharedConfig:
     never_sync: list[str] = field(default_factory=lambda: list(DEFAULT_NEVER_SYNC))
     git_excludes: list[str] = field(default_factory=list)
     max_git_file_mb: int = DEFAULT_MAX_GIT_FILE_MB
+    per_machine: dict[str, list[str]] = field(default_factory=dict)
 
 
 def load_local_config(path: Path = LOCAL_CONFIG_PATH) -> LocalConfig:
@@ -66,12 +67,14 @@ def load_shared_config(path: Path = SHARED_CONFIG_PATH) -> SharedConfig:
         return SharedConfig()
     with open(path, "rb") as f:
         data = tomllib.load(f)
+    per_machine_raw = data.get("per_machine", {})
     return SharedConfig(
         git_paths=data.get("git_paths", {}).get("paths", list(DEFAULT_GIT_PATHS)),
         rsync_paths=data.get("rsync_paths", {}).get("paths", list(DEFAULT_RSYNC_PATHS)),
         never_sync=data.get("never_sync", {}).get("patterns", list(DEFAULT_NEVER_SYNC)),
         git_excludes=data.get("git_excludes", {}).get("paths", []),
         max_git_file_mb=data.get("size_guard", {}).get("max_git_file_mb", DEFAULT_MAX_GIT_FILE_MB),
+        per_machine={name: cfg.get("excludes", []) for name, cfg in per_machine_raw.items()},
     )
 
 
@@ -85,6 +88,11 @@ def save_shared_config(config: SharedConfig, path: Path = SHARED_CONFIG_PATH) ->
         # [size_guard] is a sub-table so future guard options can be added without new top-level keys.
         "size_guard": {"max_git_file_mb": config.max_git_file_mb},
     }
+    if config.per_machine:
+        data["per_machine"] = {
+            name: {"excludes": excludes}
+            for name, excludes in config.per_machine.items()
+        }
     with open(path, "wb") as f:
         tomli_w.dump(data, f)
 
@@ -105,3 +113,21 @@ def untrack_path(path_str: str, shared_path: Path = SHARED_CONFIG_PATH) -> bool:
             save_shared_config(config, shared_path)
             return True
     return False
+
+
+def add_machine_exclude(machine_name: str, path_str: str, shared_path: Path = SHARED_CONFIG_PATH) -> None:
+    config = load_shared_config(shared_path)
+    excludes = config.per_machine.setdefault(machine_name, [])
+    if path_str not in excludes:
+        excludes.append(path_str)
+        save_shared_config(config, shared_path)
+
+
+def remove_machine_exclude(machine_name: str, path_str: str, shared_path: Path = SHARED_CONFIG_PATH) -> bool:
+    config = load_shared_config(shared_path)
+    excludes = config.per_machine.get(machine_name, [])
+    if path_str not in excludes:
+        return False
+    excludes.remove(path_str)
+    save_shared_config(config, shared_path)
+    return True
