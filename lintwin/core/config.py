@@ -129,5 +129,7 @@ def remove_machine_exclude(machine_name: str, path_str: str, shared_path: Path =
     if path_str not in excludes:
         return False
     excludes.remove(path_str)
+    if not excludes:
+        del config.per_machine[machine_name]
     save_shared_config(config, shared_path)
     return True

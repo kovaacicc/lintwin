@@ -186,3 +186,12 @@ def test_remove_machine_exclude_not_found(tmp_path):
     cfg_file.write_text("")
     result = remove_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
     assert result is False
+
+
+def test_remove_machine_exclude_prunes_empty_key(tmp_path):
+    cfg_file = tmp_path / "shared.toml"
+    cfg_file.write_text("")
+    add_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    remove_machine_exclude("laptop", "~/.config/kwinrc", cfg_file)
+    cfg = load_shared_config(cfg_file)
+    assert "laptop" not in cfg.per_machine
