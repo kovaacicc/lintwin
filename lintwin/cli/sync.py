@@ -199,24 +199,39 @@ def _do_rsync_sync(
     skip_paths: set[str],
 ) -> None:
     console.print(f"\n[bold]Rsync sync → {remote_name}...[/bold]")
+    console.print("[dim]ℹ  sync pushes from this machine — run from the machine with the newer content.[/dim]")
     local_snap = load_snapshot(SNAPSHOT_FILE)
     remote_snap = fetch_remote_snapshot(remote)
 
+    if local_snap and not _check_remote_freshness(local_snap, remote_snap, remote_name, local.machine_name):
+        return
+
+    resolutions: dict[str, Resolution] = {}
     if local_snap and remote_snap:
         conflicts = detect_conflicts(local_snap, remote_snap, remote_name, shared.rsync_paths)
         for conflict in conflicts:
-            _resolve_conflict(conflict, remote, remote_name)
+            resolutions[conflict.path] = _resolve_conflict(conflict, remote, remote_name)
+
+    excluded_from_push = {p for p, r in resolutions.items() if r in (Resolution.KEEP_REMOTE, Resolution.SKIP)}
+    keep_remote_paths = [p for p, r in resolutions.items() if r == Resolution.KEEP_REMOTE]
 
     for path in shared.rsync_paths:
         if any(path.startswith(skip) or str(path) == skip for skip in skip_paths):
             console.print(f"  [dim]Skipping {path} (dirty repo)[/dim]")
             continue
-        excludes = build_excludes_file(shared.never_sync, path)
+        excludes = build_excludes_file(shared.never_sync + list(excluded_from_push), path)
         result = rsync_path(path, remote, direction="push", excludes_file=excludes)
         if result.returncode == 0:
             console.print(f"  [green]✓[/green] {path}")
         else:
             console.print(f"  [red]✗[/red] {path}: {result.stderr[:80]}")
+
+    for file_path in keep_remote_paths:
+        result = rsync_file(file_path, remote, direction="pull")
+        if result.returncode == 0:
+            console.print(f"  [green]✓[/green] (kept remote) {file_path}")
+        else:
+            console.print(f"  [red]✗[/red] (keep remote failed) {file_path}: {result.stderr[:80]}")
 
     update_snapshot(local.machine_name, remote_name, shared.rsync_paths)
 

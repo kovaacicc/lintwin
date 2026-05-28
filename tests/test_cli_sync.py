@@ -180,3 +180,69 @@ def test_freshness_check_silent_when_local_newer() -> None:
         result = _check_remote_freshness(local, remote, "desktop", "laptop")
     assert result is True
     mock_confirm.assert_not_called()
+
+
+from contextlib import ExitStack
+
+_SNAP = Snapshot(machine="laptop", remotes={"desktop": RemoteSnapshot(timestamp="2026-05-28T08:00:00", files={})})
+_SYNC_CONFLICT = Conflict(path="~/doc.txt", local_modified="2026-05-28T09:00:00", remote_modified="2026-05-28T10:00:00", is_binary=False)
+
+
+def _setup_do_rsync(stack, resolution, conflicts=None):
+    if conflicts is None:
+        conflicts = [_SYNC_CONFLICT]
+    stack.enter_context(patch("lintwin.cli.sync.load_snapshot", return_value=_SNAP))
+    stack.enter_context(patch("lintwin.cli.sync.fetch_remote_snapshot", return_value=_SNAP))
+    stack.enter_context(patch("lintwin.cli.sync._check_remote_freshness", return_value=True))
+    stack.enter_context(patch("lintwin.cli.sync.detect_conflicts", return_value=conflicts))
+    if resolution is not None:
+        stack.enter_context(patch("lintwin.cli.sync._resolve_conflict", return_value=resolution))
+    stack.enter_context(patch("lintwin.cli.sync.update_snapshot"))
+    mock_bef = stack.enter_context(patch("lintwin.cli.sync.build_excludes_file", return_value="/tmp/ex"))
+    return mock_bef
+
+
+def test_do_rsync_sync_keep_remote_excluded_from_push_and_rsync_file_called() -> None:
+    from lintwin.cli.sync import _do_rsync_sync
+    with ExitStack() as stack:
+        mock_bef = _setup_do_rsync(stack, Resolution.KEEP_REMOTE)
+        stack.enter_context(patch("lintwin.cli.sync.rsync_path", return_value=MagicMock(returncode=0, stderr="")))
+        mock_rf = stack.enter_context(patch("lintwin.cli.sync.rsync_file", return_value=MagicMock(returncode=0, stderr="")))
+        _do_rsync_sync(MOCK_SHARED, MOCK_LOCAL, "desktop", _REMOTE, set())
+    assert "~/doc.txt" in mock_bef.call_args[0][0]
+    mock_rf.assert_called_once()
+    assert mock_rf.call_args.kwargs.get("direction") == "pull"
+
+
+def test_do_rsync_sync_skip_excluded_from_push_no_rsync_file() -> None:
+    from lintwin.cli.sync import _do_rsync_sync
+    with ExitStack() as stack:
+        mock_bef = _setup_do_rsync(stack, Resolution.SKIP)
+        stack.enter_context(patch("lintwin.cli.sync.rsync_path", return_value=MagicMock(returncode=0, stderr="")))
+        mock_rf = stack.enter_context(patch("lintwin.cli.sync.rsync_file"))
+        _do_rsync_sync(MOCK_SHARED, MOCK_LOCAL, "desktop", _REMOTE, set())
+    assert "~/doc.txt" in mock_bef.call_args[0][0]
+    mock_rf.assert_not_called()
+
+
+def test_do_rsync_sync_keep_local_included_in_push_no_rsync_file() -> None:
+    from lintwin.cli.sync import _do_rsync_sync
+    with ExitStack() as stack:
+        mock_bef = _setup_do_rsync(stack, Resolution.KEEP_LOCAL)
+        stack.enter_context(patch("lintwin.cli.sync.rsync_path", return_value=MagicMock(returncode=0, stderr="")))
+        mock_rf = stack.enter_context(patch("lintwin.cli.sync.rsync_file"))
+        _do_rsync_sync(MOCK_SHARED, MOCK_LOCAL, "desktop", _REMOTE, set())
+    assert "~/doc.txt" not in mock_bef.call_args[0][0]
+    mock_rf.assert_not_called()
+
+
+def test_do_rsync_sync_no_conflicts_standard_push() -> None:
+    from lintwin.cli.sync import _do_rsync_sync
+    with ExitStack() as stack:
+        _setup_do_rsync(stack, resolution=None, conflicts=[])
+        mock_rp = stack.enter_context(patch("lintwin.cli.sync.rsync_path", return_value=MagicMock(returncode=0, stderr="")))
+        mock_rf = stack.enter_context(patch("lintwin.cli.sync.rsync_file"))
+        _do_rsync_sync(MOCK_SHARED, MOCK_LOCAL, "desktop", _REMOTE, set())
+    mock_rp.assert_called_once()
+    assert mock_rp.call_args.kwargs.get("direction", "push") == "push"
+    mock_rf.assert_not_called()
