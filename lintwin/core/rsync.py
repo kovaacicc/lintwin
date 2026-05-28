@@ -2,6 +2,7 @@ import json
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from .config import RemoteConfig
 from .snapshot import Snapshot, RemoteSnapshot, FileEntry
@@ -14,6 +15,12 @@ class Conflict:
     local_modified: str
     remote_modified: str
     is_binary: bool
+
+
+class Resolution(Enum):
+    KEEP_LOCAL = "keep_local"
+    KEEP_REMOTE = "keep_remote"
+    SKIP = "skip"
 
 
 def check_connectivity(remote: RemoteConfig) -> bool:
@@ -163,4 +170,22 @@ def rsync_path(
         cmd.extend([f"{expanded}/", remote_path])
     else:
         cmd.extend([remote_path, f"{expanded}/"])
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def rsync_file(
+    local_path: str,
+    remote: RemoteConfig,
+    direction: str = "pull",
+) -> subprocess.CompletedProcess:
+    expanded = str(Path(local_path).expanduser())
+    host = remote.tailscale_hostname or remote.host
+    remote_file = f"{remote.ssh_user}@{host}:{_to_remote_path(local_path)}"
+    cmd = ["rsync", "-avz"]
+    if remote.ssh_port:
+        cmd += ["-e", f"ssh -p {remote.ssh_port}"]
+    if direction == "pull":
+        cmd.extend([remote_file, expanded])
+    else:
+        cmd.extend([expanded, remote_file])
     return subprocess.run(cmd, capture_output=True, text=True)

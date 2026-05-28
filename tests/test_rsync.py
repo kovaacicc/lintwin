@@ -4,7 +4,7 @@ from lintwin.core.config import RemoteConfig
 from lintwin.core.snapshot import Snapshot, RemoteSnapshot, FileEntry
 from lintwin.core.rsync import (
     check_connectivity, detect_conflicts, build_excludes_file, _is_binary, Conflict,
-    rsync_path, fetch_remote_snapshot,
+    rsync_path, rsync_file, fetch_remote_snapshot, Resolution,
 )
 
 
@@ -167,3 +167,39 @@ def test_is_binary_binary_file(tmp_path: Path) -> None:
     f = tmp_path / "binary.bin"
     f.write_bytes(b"\x00\x01\x02")
     assert _is_binary(str(f)) is True
+
+
+def test_resolution_enum_values() -> None:
+    assert Resolution.KEEP_LOCAL.value == "keep_local"
+    assert Resolution.KEEP_REMOTE.value == "keep_remote"
+    assert Resolution.SKIP.value == "skip"
+
+
+def test_rsync_file_pull_uses_tilde_for_remote() -> None:
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        rsync_file("~/Documents/notes.txt", REMOTE, direction="pull")
+    cmd = mock_run.call_args[0][0]
+    remote_arg = next(a for a in cmd if "@" in a and ":" in a)
+    assert ":~/" in remote_arg, f"Expected tilde in remote path, got: {remote_arg}"
+    assert ":/home/" not in remote_arg
+
+
+def test_rsync_file_push_uses_tilde_for_remote() -> None:
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        rsync_file("~/Documents/notes.txt", REMOTE, direction="push")
+    cmd = mock_run.call_args[0][0]
+    remote_arg = next(a for a in cmd if "@" in a and ":" in a)
+    assert ":~/" in remote_arg, f"Expected tilde in remote path, got: {remote_arg}"
+    assert ":/home/" not in remote_arg
+
+
+def test_rsync_file_respects_ssh_port() -> None:
+    remote_with_port = RemoteConfig(host="10.0.0.1", ssh_user="karlo", ssh_port=2222)
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        rsync_file("~/Documents/notes.txt", remote_with_port, direction="pull")
+    cmd = mock_run.call_args[0][0]
+    assert "-e" in cmd
+    assert "2222" in cmd[cmd.index("-e") + 1]
