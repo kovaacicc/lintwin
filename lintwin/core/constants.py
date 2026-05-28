@@ -3,7 +3,7 @@ from pathlib import Path
 LINTWIN_DATA = Path.home() / ".local/share/lintwin"
 LINTWIN_CONFIG_DIR = Path.home() / ".config/lintwin"
 BARE_REPO = LINTWIN_DATA / "repo"
-PACKAGES_DIR = LINTWIN_DATA / "packages"
+PACKAGES_DIR = LINTWIN_CONFIG_DIR / "packages"
 SNAPSHOT_FILE = LINTWIN_DATA / "last_sync.json"
 LOCAL_CONFIG_PATH = LINTWIN_CONFIG_DIR / "config.toml"
 SHARED_CONFIG_PATH = LINTWIN_CONFIG_DIR / "shared.toml"

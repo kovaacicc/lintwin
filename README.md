@@ -180,10 +180,11 @@ lintwin untrack ~/.config/nvim               # stop tracking
 ```bash
 lintwin packages export             # snapshot installed packages (pacman, AUR, pip, npm)
 lintwin packages diff --to desktop  # show what's missing between this machine and desktop
-lintwin packages install            # install packages that are on remote but missing locally
+lintwin packages install            # install packages missing from your own exported snapshot
+lintwin packages install --from desktop  # install packages that desktop has but you don't
 ```
 
-Package lists live in `~/.local/share/lintwin/packages/` and are committed to your git repo so they stay in sync.
+Package lists are written to `~/.config/lintwin/packages/<machine-name>/` — inside `~/.config` which is git-tracked, so they're committed and synced automatically via `lintwin sync`. Run `lintwin packages export` on each machine, then `lintwin sync` to share. `packages diff` reads from your local git copy, so the remote machine can be offline.
 
 ## CLI reference
 
@@ -210,8 +211,9 @@ lintwin track <path> --via rsync            add to rsync paths
 lintwin untrack <path>                      remove from sync
 
 lintwin packages export                     snapshot installed packages
-lintwin packages diff --to <remote>         show packages missing between machines
-lintwin packages install                    install packages missing locally
+lintwin packages diff --to <remote>         show packages missing between machines (offline-safe)
+lintwin packages install                    install packages missing from your own snapshot
+lintwin packages install --from <machine>   install packages from another machine's snapshot
 
 lintwin remote list                         show all configured remotes
 lintwin remote add <name> --host <ip> --ssh-user <user>   add a remote machine
@@ -229,7 +231,7 @@ lintwin remote remove <name>                remove a remote
 | `~/.config/lintwin/config.toml` | Local machine config (name, remote hosts). **Never committed.** |
 | `~/.config/lintwin/shared.toml` | Shared config (tracked paths). Committed and synced. |
 | `~/.local/share/lintwin/repo/` | Bare git repo |
-| `~/.local/share/lintwin/packages/` | Exported package lists |
+| `~/.config/lintwin/packages/<machine>/` | Exported package lists (git-tracked, one dir per machine) |
 | `~/.local/share/lintwin/last_sync.json` | rsync snapshot for conflict detection |
 
 ### `~/.config/lintwin/config.toml` (local only, never committed)
@@ -322,5 +324,5 @@ A conflict means the same file was modified on both machines since the last sync
 
 If lintwin detects that the remote machine has synced more recently than your last sync with it, it will warn you and ask whether to proceed. Answer N and run `lintwin pull` first if you think the remote has content you haven't seen.
 
-**`lintwin packages diff` shows everything as missing**
-Run `lintwin packages export` on both machines first to generate the package snapshots.
+**`lintwin packages diff` shows everything as missing or "no package data"**
+Run `lintwin packages export` on the remote machine, then `lintwin sync` to pull its snapshot locally. `diff` reads from your local git copy — the remote does not need to be online.
