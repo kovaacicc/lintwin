@@ -102,6 +102,12 @@ Use `lintwin remote edit` to add `tailscale_hostname` to an existing remote:
 lintwin remote edit desktop --tailscale-hostname desktop
 ```
 
+To remove it later:
+
+```bash
+lintwin remote edit desktop --no-tailscale
+```
+
 Or set it when adding the remote:
 
 ```bash
