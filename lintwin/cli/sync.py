@@ -7,8 +7,8 @@ from lintwin.core.config import (
     load_local_config, load_shared_config, save_shared_config,
 )
 from lintwin.core.scanner import scan_for_dirty_repos, DirtyRepo
-from lintwin.core.rsync import check_connectivity, fetch_remote_snapshot, detect_conflicts, build_excludes_file, rsync_path
-from lintwin.core.snapshot import load_snapshot, save_snapshot, build_file_snapshot, now_iso, RemoteSnapshot, update_snapshot
+from lintwin.core.rsync import check_connectivity, fetch_remote_snapshot, detect_conflicts, build_excludes_file, rsync_path, rsync_file, Resolution, Conflict
+from lintwin.core.snapshot import load_snapshot, now_iso, update_snapshot, Snapshot
 from lintwin.core import git as git_core
 from lintwin.core.constants import BARE_REPO, SNAPSHOT_FILE
 from lintwin.core.sizeguard import scan_oversized, FlaggedItem
@@ -221,7 +221,30 @@ def _do_rsync_sync(
     update_snapshot(local.machine_name, remote_name, shared.rsync_paths)
 
 
-def _resolve_conflict(conflict, remote: RemoteConfig, remote_name: str) -> None:
+def _check_remote_freshness(
+    local_snap: Snapshot,
+    remote_snap: Snapshot | None,
+    remote_name: str,
+    machine_name: str,
+) -> bool:
+    if remote_snap is None:
+        return True
+    local_entry = local_snap.remotes.get(remote_name)
+    if not local_entry:
+        return True
+    remote_entry = remote_snap.remotes.get(machine_name)
+    if not remote_entry:
+        return True
+    if remote_entry.timestamp > local_entry.timestamp:
+        console.print(f"\n[yellow]⚠  '{remote_name}' last synced at {remote_entry.timestamp[:19]} — after your last sync at {local_entry.timestamp[:19]}.[/yellow]")
+        console.print("   It may have content newer than yours. Run [cyan]lintwin pull[/cyan] first if unsure.")
+        if not click.confirm("   Proceed with sync anyway?", default=False):
+            console.print("Aborted.")
+            return False
+    return True
+
+
+def _resolve_conflict(conflict: Conflict, remote: RemoteConfig, remote_name: str) -> Resolution:
     console.print(f"\n[yellow]⚠ CONFLICT:[/yellow] {conflict.path}")
     console.print(f"  local:  modified {conflict.local_modified}")
     console.print(f"  {remote_name}: modified {conflict.remote_modified}")
@@ -230,9 +253,9 @@ def _resolve_conflict(conflict, remote: RemoteConfig, remote_name: str) -> None:
         choices += "  [4] Show diff"
     choice = click.prompt(f"  {choices}", default="3")
     if choice == "4" and not conflict.is_binary:
-        import subprocess
-        subprocess.run(["diff", "--color", conflict.path,
-                        f"{remote.ssh_user}@{remote.host}:{conflict.path}"])
+        import subprocess as _sp
+        _sp.run(["diff", "--color", conflict.path, f"{remote.ssh_user}@{remote.host}:{conflict.path}"])
         choice = click.prompt("  [1] Keep local  [2] Keep remote  [3] Skip", default="3")
+    return {"1": Resolution.KEEP_LOCAL, "2": Resolution.KEEP_REMOTE, "3": Resolution.SKIP}.get(choice, Resolution.SKIP)
 
 

@@ -2,6 +2,8 @@ from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 from lintwin.cli.main import cli
 from lintwin.core.config import LocalConfig, RemoteConfig, SharedConfig
+from lintwin.core.rsync import Conflict, Resolution
+from lintwin.core.snapshot import Snapshot, RemoteSnapshot
 from lintwin.core.scanner import DirtyRepo
 from pathlib import Path
 
@@ -105,3 +107,76 @@ def test_apply_size_resolution_is_idempotent() -> None:
     apply_size_resolution(shared, item, "r")
     assert shared.git_excludes == ["~/.config/big.bin"]
     assert shared.rsync_paths == ["~/.config/big.bin"]
+
+
+_REMOTE = RemoteConfig(host="10.0.0.1", ssh_user="karlo")
+_CONFLICT = Conflict(path="~/doc.txt", local_modified="2026-05-28T09:00:00", remote_modified="2026-05-28T10:00:00", is_binary=False)
+
+
+def test_resolve_conflict_keep_local_returns_keep_local() -> None:
+    from lintwin.cli.sync import _resolve_conflict
+    with patch("lintwin.cli.sync.click.prompt", return_value="1"):
+        result = _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+    assert result == Resolution.KEEP_LOCAL
+
+
+def test_resolve_conflict_keep_remote_returns_keep_remote() -> None:
+    from lintwin.cli.sync import _resolve_conflict
+    with patch("lintwin.cli.sync.click.prompt", return_value="2"):
+        result = _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+    assert result == Resolution.KEEP_REMOTE
+
+
+def test_resolve_conflict_skip_returns_skip() -> None:
+    from lintwin.cli.sync import _resolve_conflict
+    with patch("lintwin.cli.sync.click.prompt", return_value="3"):
+        result = _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+    assert result == Resolution.SKIP
+
+
+def test_resolve_conflict_show_diff_then_keep_local() -> None:
+    from lintwin.cli.sync import _resolve_conflict
+    with patch("lintwin.cli.sync.click.prompt", side_effect=["4", "1"]):
+        with patch("subprocess.run"):
+            result = _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+    assert result == Resolution.KEEP_LOCAL
+
+
+def test_freshness_check_silent_when_remote_snap_is_none() -> None:
+    from lintwin.cli.sync import _check_remote_freshness
+    local = Snapshot(machine="laptop", remotes={"desktop": RemoteSnapshot(timestamp="2026-05-28T09:00:00", files={})})
+    assert _check_remote_freshness(local, None, "desktop", "laptop") is True
+
+
+def test_freshness_check_silent_when_no_local_entry() -> None:
+    from lintwin.cli.sync import _check_remote_freshness
+    local = Snapshot(machine="laptop", remotes={})
+    remote = Snapshot(machine="desktop", remotes={"laptop": RemoteSnapshot(timestamp="2026-05-28T10:00:00", files={})})
+    assert _check_remote_freshness(local, remote, "desktop", "laptop") is True
+
+
+def test_freshness_check_silent_when_no_remote_entry() -> None:
+    from lintwin.cli.sync import _check_remote_freshness
+    local = Snapshot(machine="laptop", remotes={"desktop": RemoteSnapshot(timestamp="2026-05-28T09:00:00", files={})})
+    remote = Snapshot(machine="desktop", remotes={})
+    assert _check_remote_freshness(local, remote, "desktop", "laptop") is True
+
+
+def test_freshness_check_warns_when_remote_newer() -> None:
+    from lintwin.cli.sync import _check_remote_freshness
+    local = Snapshot(machine="laptop", remotes={"desktop": RemoteSnapshot(timestamp="2026-05-28T09:00:00", files={})})
+    remote = Snapshot(machine="desktop", remotes={"laptop": RemoteSnapshot(timestamp="2026-05-28T14:00:00", files={})})
+    with patch("click.confirm", return_value=True):
+        with patch("lintwin.cli.sync.console.print"):
+            result = _check_remote_freshness(local, remote, "desktop", "laptop")
+    assert result is True
+
+
+def test_freshness_check_silent_when_local_newer() -> None:
+    from lintwin.cli.sync import _check_remote_freshness
+    local = Snapshot(machine="laptop", remotes={"desktop": RemoteSnapshot(timestamp="2026-05-28T14:00:00", files={})})
+    remote = Snapshot(machine="desktop", remotes={"laptop": RemoteSnapshot(timestamp="2026-05-28T09:00:00", files={})})
+    with patch("click.confirm") as mock_confirm:
+        result = _check_remote_freshness(local, remote, "desktop", "laptop")
+    assert result is True
+    mock_confirm.assert_not_called()
