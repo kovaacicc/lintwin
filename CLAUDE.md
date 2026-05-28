@@ -31,8 +31,8 @@ pyproject.toml  entry point: lintwin.cli.main:cli
 - `~/.local/share/lintwin/last_sync.json` — rsync snapshot for conflict detection
 
 ## Implementation status
-All planned tasks complete. 99/99 tests passing.
-Commands: init, sync, status, pull, diff, track, untrack, packages (export/diff/install)
+All planned tasks complete. 151/151 tests passing.
+Commands: init, sync, status, pull, diff, track, untrack, packages (export/diff/install), remote (add/list/remove/edit)
 `lintwin init` uses an interactive arrow-key selector (`cli/selector.py`, built on `rich.Live`
 + `readchar`) to assign home-directory items to git/rsync/skip with live size totals.
 Before each `lintwin sync`, `core/sizeguard.py` scans git-tracked paths for oversized new
@@ -41,7 +41,6 @@ anyway. The threshold defaults to 25 MB and can be set at init time with `--max-
 (written into `shared.toml`).
 
 ## Known gaps (not yet implemented)
-- No `lintwin remote add` command — remotes added only during `init` wizard or by hand-editing config.toml
 - PackageManager only has Arch implementation — adding Debian/Ubuntu means writing `debian.py` implementing the ABC
 - `lintwin init --join` does not auto-detect existing machines from the repo; user enters each remote manually
 

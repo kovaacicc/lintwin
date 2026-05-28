@@ -96,7 +96,19 @@ This lists all your connected devices with their Tailscale hostnames (e.g. `desk
 
 ### Configure lintwin to use Tailscale
 
-In `~/.config/lintwin/config.toml`, add `tailscale_hostname` to each remote:
+Use `lintwin remote edit` to add `tailscale_hostname` to an existing remote:
+
+```bash
+lintwin remote edit desktop --tailscale-hostname desktop
+```
+
+Or set it when adding the remote:
+
+```bash
+lintwin remote add desktop --host 192.168.1.10 --ssh-user user --tailscale-hostname desktop
+```
+
+The resulting entry in `~/.config/lintwin/config.toml` looks like:
 
 ```toml
 [remotes.desktop]
@@ -194,6 +206,12 @@ lintwin untrack <path>                      remove from sync
 lintwin packages export                     snapshot installed packages
 lintwin packages diff --to <remote>         show packages missing between machines
 lintwin packages install                    install packages missing locally
+
+lintwin remote list                         show all configured remotes
+lintwin remote add <name> --host <ip> --ssh-user <user>   add a remote machine
+lintwin remote add <name> --host <ip> --ssh-user <user> --tailscale-hostname <ts> --ssh-port <port>
+lintwin remote edit <name> --host <ip>      update one or more fields of a remote
+lintwin remote remove <name>                remove a remote
 ```
 
 **Always run `lintwin sync` from the machine with the newer content.** `sync` pushes your local changes to the remote and treats your machine as the source of truth. If you've been working on laptop, run `sync` from laptop. When you switch machines, run `lintwin pull` on the new machine first to catch up before you start working.
