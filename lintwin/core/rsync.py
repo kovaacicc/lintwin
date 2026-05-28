@@ -36,7 +36,7 @@ def fetch_remote_snapshot(remote: RemoteConfig, remote_path: Path = SNAPSHOT_FIL
     ssh_cmd = ["ssh"]
     if remote.ssh_port:
         ssh_cmd += ["-p", str(remote.ssh_port)]
-    ssh_cmd += [f"{remote.ssh_user}@{host}", f"cat {remote_path}"]
+    ssh_cmd += [f"{remote.ssh_user}@{host}", f"cat {_to_remote_path(remote_path)}"]
     result = subprocess.run(ssh_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         return None
@@ -78,6 +78,20 @@ def detect_conflicts(
                     is_binary=_is_binary(path),
                 ))
     return conflicts
+
+
+def _to_remote_path(local_path: str | Path) -> str:
+    """Convert a local absolute or tilde path to ~/... for use as the remote side of rsync/SSH.
+
+    Paths outside $HOME are returned unchanged (e.g. /opt/data stays as /opt/data).
+    """
+    abs_path = str(Path(local_path).expanduser())
+    home = str(Path.home())
+    if abs_path == home:
+        return "~"
+    if abs_path.startswith(home + "/"):
+        return "~/" + abs_path[len(home) + 1:]
+    return abs_path
 
 
 def _is_binary(path: str) -> bool:
@@ -137,7 +151,7 @@ def rsync_path(
 ) -> subprocess.CompletedProcess:
     expanded = str(Path(local_path).expanduser())
     host = remote.tailscale_hostname or remote.host
-    remote_path = f"{remote.ssh_user}@{host}:{expanded}/"
+    remote_path = f"{remote.ssh_user}@{host}:{_to_remote_path(local_path)}/"
     cmd = ["rsync", "-avz", "--delete"]
     if remote.ssh_port:
         cmd += ["-e", f"ssh -p {remote.ssh_port}"]

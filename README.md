@@ -219,6 +219,8 @@ tailscale_hostname = "desktop"   # optional — tried first if set
 ssh_port = 2222                  # optional — omit if using default port 22
 ```
 
+`ssh_user` does not need to match your local username. rsync and SSH paths are sent as `~/...` so they resolve relative to the remote user's home directory, not the local one.
+
 ### `~/.config/lintwin/shared.toml` (committed, synced across machines)
 
 ```toml

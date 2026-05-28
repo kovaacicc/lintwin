@@ -3,7 +3,8 @@ from unittest.mock import patch, MagicMock
 from lintwin.core.config import RemoteConfig
 from lintwin.core.snapshot import Snapshot, RemoteSnapshot, FileEntry
 from lintwin.core.rsync import (
-    check_connectivity, detect_conflicts, build_excludes_file, _is_binary, Conflict
+    check_connectivity, detect_conflicts, build_excludes_file, _is_binary, Conflict,
+    rsync_path, fetch_remote_snapshot,
 )
 
 
@@ -121,6 +122,39 @@ def test_build_excludes_file_acceptance_home_source() -> None:
     assert "*.gpg" in content
     assert "/.ssh/id_*" in content
     assert "~" not in content
+
+
+def test_rsync_path_push_uses_tilde_for_remote() -> None:
+    """Remote path must use ~/... so rsync expands ~ relative to remote user's home, not local."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        rsync_path("~/Documents", REMOTE)
+    cmd = mock_run.call_args[0][0]
+    remote_arg = next(a for a in cmd if "@" in a and ":" in a)
+    assert ":~/" in remote_arg, f"Expected tilde in remote path, got: {remote_arg}"
+    assert ":/home/" not in remote_arg, f"Local home leaked into remote path: {remote_arg}"
+
+
+def test_rsync_path_pull_uses_tilde_for_remote() -> None:
+    """Pull direction must also use ~/... on the remote side."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        rsync_path("~/Documents", REMOTE, direction="pull")
+    cmd = mock_run.call_args[0][0]
+    remote_arg = next(a for a in cmd if "@" in a and ":" in a)
+    assert ":~/" in remote_arg, f"Expected tilde in remote path, got: {remote_arg}"
+    assert ":/home/" not in remote_arg, f"Local home leaked into remote path: {remote_arg}"
+
+
+def test_fetch_remote_snapshot_uses_tilde_path_in_ssh_command() -> None:
+    """SSH cat command must use ~/... so it resolves against the remote user's home."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        fetch_remote_snapshot(REMOTE)
+    ssh_cmd = mock_run.call_args[0][0]
+    cat_arg = ssh_cmd[-1]
+    assert cat_arg.startswith("cat ~/"), f"Expected tilde path in cat command, got: {cat_arg}"
+    assert "/home/" not in cat_arg, f"Local home leaked into SSH snapshot path: {cat_arg}"
 
 
 def test_is_binary_text_file(tmp_path: Path) -> None:
