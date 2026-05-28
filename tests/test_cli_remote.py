@@ -144,6 +144,19 @@ def test_remote_edit_updates_host(tmp_path: Path, monkeypatch) -> None:
     assert r.ssh_user == "karlo"  # unchanged
 
 
+def test_remote_edit_clears_tailscale_hostname(tmp_path: Path, monkeypatch) -> None:
+    from lintwin.core.config import RemoteConfig
+    cfg = _make_config(tmp_path)
+    config = load_local_config(cfg)
+    config.remotes["laptop"] = RemoteConfig(host="10.0.0.5", ssh_user="karlo", tailscale_hostname="laptop.tail")
+    save_local_config(config, cfg)
+    _patch(monkeypatch, cfg)
+
+    result = CliRunner().invoke(cli, ["remote", "edit", "laptop", "--no-tailscale"])
+    assert result.exit_code == 0, result.output
+    assert load_local_config(cfg).remotes["laptop"].tailscale_hostname is None
+
+
 def test_remote_edit_fails_if_not_found(tmp_path: Path, monkeypatch) -> None:
     cfg = _make_config(tmp_path)
     _patch(monkeypatch, cfg)

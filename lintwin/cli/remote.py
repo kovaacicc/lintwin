@@ -86,9 +86,11 @@ def remote_remove(name: str) -> None:
 @click.option("--host", default=None, help="New host / IP address.")
 @click.option("--ssh-user", default=None, help="New SSH username.")
 @click.option("--tailscale-hostname", default=None, help="New Tailscale hostname.")
+@click.option("--no-tailscale", is_flag=True, default=False, help="Remove the Tailscale hostname.")
 @click.option("--ssh-port", type=int, default=None, help="New SSH port.")
 def remote_edit(name: str, host: str | None, ssh_user: str | None,
-                tailscale_hostname: str | None, ssh_port: int | None) -> None:
+                tailscale_hostname: str | None, no_tailscale: bool,
+                ssh_port: int | None) -> None:
     """Edit a remote machine's settings."""
     config = _load_or_exit()
     if name not in config.remotes:
@@ -99,7 +101,9 @@ def remote_edit(name: str, host: str | None, ssh_user: str | None,
         r.host = host
     if ssh_user is not None:
         r.ssh_user = ssh_user
-    if tailscale_hostname is not None:
+    if no_tailscale:
+        r.tailscale_hostname = None
+    elif tailscale_hostname is not None:
         r.tailscale_hostname = tailscale_hostname
     if ssh_port is not None:
         r.ssh_port = ssh_port
