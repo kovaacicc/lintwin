@@ -2,7 +2,7 @@ import click
 from rich.console import Console
 from lintwin.core.config import load_local_config, load_shared_config
 from lintwin.core.rsync import check_connectivity, fetch_remote_snapshot, detect_conflicts, build_excludes_file, rsync_path
-from lintwin.core.snapshot import load_snapshot
+from lintwin.core.snapshot import load_snapshot, update_snapshot
 from lintwin.core import git as git_core
 from lintwin.core.constants import BARE_REPO, SNAPSHOT_FILE
 from lintwin.cli.sync import _select_remote
@@ -51,4 +51,5 @@ def pull_cmd(remote_name: str | None) -> None:
     for path in shared.rsync_paths:
         excludes = build_excludes_file(shared.never_sync, path)
         rsync_path(path, remote, direction="pull", excludes_file=excludes)
+    update_snapshot(local.machine_name, remote_name_resolved, shared.rsync_paths, path=SNAPSHOT_FILE)
     console.print("[green]Pull complete.[/green]")

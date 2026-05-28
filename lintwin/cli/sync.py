@@ -8,7 +8,7 @@ from lintwin.core.config import (
 )
 from lintwin.core.scanner import scan_for_dirty_repos, DirtyRepo
 from lintwin.core.rsync import check_connectivity, fetch_remote_snapshot, detect_conflicts, build_excludes_file, rsync_path
-from lintwin.core.snapshot import load_snapshot, save_snapshot, build_file_snapshot, now_iso, RemoteSnapshot
+from lintwin.core.snapshot import load_snapshot, save_snapshot, build_file_snapshot, now_iso, RemoteSnapshot, update_snapshot
 from lintwin.core import git as git_core
 from lintwin.core.constants import BARE_REPO, SNAPSHOT_FILE
 from lintwin.core.sizeguard import scan_oversized, FlaggedItem
@@ -218,7 +218,7 @@ def _do_rsync_sync(
         else:
             console.print(f"  [red]✗[/red] {path}: {result.stderr[:80]}")
 
-    _update_snapshot(local.machine_name, remote_name, shared.rsync_paths)
+    update_snapshot(local.machine_name, remote_name, shared.rsync_paths)
 
 
 def _resolve_conflict(conflict, remote: RemoteConfig, remote_name: str) -> None:
@@ -236,11 +236,3 @@ def _resolve_conflict(conflict, remote: RemoteConfig, remote_name: str) -> None:
         choice = click.prompt("  [1] Keep local  [2] Keep remote  [3] Skip", default="3")
 
 
-def _update_snapshot(machine_name: str, remote_name: str, rsync_paths: list[str]) -> None:
-    snap = load_snapshot(SNAPSHOT_FILE)
-    if snap is None:
-        from lintwin.core.snapshot import Snapshot
-        snap = Snapshot(machine=machine_name)
-    file_entries = build_file_snapshot(rsync_paths)
-    snap.remotes[remote_name] = RemoteSnapshot(timestamp=now_iso(), files=file_entries)
-    save_snapshot(snap, SNAPSHOT_FILE)

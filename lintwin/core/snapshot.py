@@ -77,3 +77,21 @@ def _add_entry(entries: dict[str, FileEntry], path: Path) -> None:
         size=stat.st_size,
         modified=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
     )
+
+
+def update_snapshot(
+    machine_name: str,
+    remote_name: str,
+    rsync_paths: list[str],
+    path: Path | None = None,
+) -> None:
+    if path is None:
+        path = SNAPSHOT_FILE
+    snap = load_snapshot(path)
+    if snap is None:
+        snap = Snapshot(machine=machine_name)
+    snap.remotes[remote_name] = RemoteSnapshot(
+        timestamp=now_iso(),
+        files=build_file_snapshot(rsync_paths),
+    )
+    save_snapshot(snap, path)

@@ -43,3 +43,23 @@ def test_build_file_snapshot(tmp_path: Path) -> None:
     entries = build_file_snapshot([str(tmp_path)])
     assert str(f) in entries
     assert entries[str(f)].size == 5
+
+
+def test_update_snapshot_creates_entry_for_remote(tmp_path: Path) -> None:
+    from lintwin.core.snapshot import update_snapshot
+    path = tmp_path / "snap.json"
+    update_snapshot("laptop", "desktop", [], path=path)
+    snap = load_snapshot(path)
+    assert snap is not None
+    assert snap.machine == "laptop"
+    assert "desktop" in snap.remotes
+
+
+def test_update_snapshot_preserves_existing_remotes(tmp_path: Path) -> None:
+    from lintwin.core.snapshot import update_snapshot
+    path = tmp_path / "snap.json"
+    update_snapshot("laptop", "pc", [], path=path)
+    update_snapshot("laptop", "desktop", [], path=path)
+    snap = load_snapshot(path)
+    assert "pc" in snap.remotes
+    assert "desktop" in snap.remotes
