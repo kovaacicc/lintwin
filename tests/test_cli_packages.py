@@ -158,3 +158,70 @@ def test_packages_install_help() -> None:
     runner = CliRunner()
     result = runner.invoke(cli, ["packages", "install", "--help"])
     assert result.exit_code == 0
+
+
+def test_packages_prune_help() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli, ["packages", "prune", "--help"])
+    assert result.exit_code == 0
+
+
+def test_packages_prune_uninstalls_extra_on_confirm(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("lintwin.cli.packages.PACKAGES_DIR", tmp_path)
+    monkeypatch.setattr(
+        "lintwin.cli.packages.load_local_config",
+        lambda: _make_local_config(machine_name="mylaptop"),
+    )
+    (tmp_path / "desktop").mkdir()
+    (tmp_path / "desktop" / "pacman.json").write_text(json.dumps({"explicit": ["nvim"], "aur": []}))
+
+    mock_mgr = MagicMock()
+    mock_mgr.name.return_value = "pacman"
+    mock_mgr.diff.return_value = {"missing": [], "extra": ["htop"]}
+    monkeypatch.setattr("lintwin.cli.packages.get_available_managers", lambda: [mock_mgr])
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["packages", "prune", "--from", "desktop"], input="y\n")
+    assert result.exit_code == 0
+    mock_mgr.uninstall.assert_called_once_with(["htop"])
+
+
+def test_packages_prune_aborts_on_no(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("lintwin.cli.packages.PACKAGES_DIR", tmp_path)
+    monkeypatch.setattr(
+        "lintwin.cli.packages.load_local_config",
+        lambda: _make_local_config(machine_name="mylaptop"),
+    )
+    (tmp_path / "desktop").mkdir()
+    (tmp_path / "desktop" / "pacman.json").write_text(json.dumps({"explicit": ["nvim"], "aur": []}))
+
+    mock_mgr = MagicMock()
+    mock_mgr.name.return_value = "pacman"
+    mock_mgr.diff.return_value = {"missing": [], "extra": ["htop"]}
+    monkeypatch.setattr("lintwin.cli.packages.get_available_managers", lambda: [mock_mgr])
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["packages", "prune", "--from", "desktop"], input="n\n")
+    assert result.exit_code == 0
+    mock_mgr.uninstall.assert_not_called()
+
+
+def test_packages_prune_nothing_to_prune(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("lintwin.cli.packages.PACKAGES_DIR", tmp_path)
+    monkeypatch.setattr(
+        "lintwin.cli.packages.load_local_config",
+        lambda: _make_local_config(machine_name="mylaptop"),
+    )
+    (tmp_path / "desktop").mkdir()
+    (tmp_path / "desktop" / "pacman.json").write_text(json.dumps({"explicit": ["nvim"], "aur": []}))
+
+    mock_mgr = MagicMock()
+    mock_mgr.name.return_value = "pacman"
+    mock_mgr.diff.return_value = {"missing": [], "extra": []}
+    monkeypatch.setattr("lintwin.cli.packages.get_available_managers", lambda: [mock_mgr])
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["packages", "prune", "--from", "desktop"])
+    assert result.exit_code == 0
+    assert "nothing to prune" in result.output
+    mock_mgr.uninstall.assert_not_called()

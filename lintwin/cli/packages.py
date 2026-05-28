@@ -61,6 +61,36 @@ def diff_cmd(remote_name: str) -> None:
             console.print(f"[green]{mgr.name()}:[/green] in sync with {remote_name}")
 
 
+@packages_cmd.command("prune")
+@click.option("--from", "from_machine", required=True, metavar="MACHINE",
+              help="Remove packages not present in this machine's export.")
+def prune_cmd(from_machine: str) -> None:
+    """Uninstall packages extra compared to another machine's export (asks for confirmation)."""
+    source_dir = PACKAGES_DIR / from_machine
+    if not source_dir.exists():
+        console.print(f"[red]No exported package files for {from_machine}.[/red] Run `lintwin packages export` on {from_machine} then sync.")
+        raise SystemExit(1)
+
+    managers_by_name = {mgr.name(): mgr for mgr in get_available_managers()}
+
+    for pkg_file in source_dir.glob("*.json"):
+        mgr_name = pkg_file.stem
+        if mgr_name not in managers_by_name:
+            console.print(f"[dim]Skipping {mgr_name} (not available on this machine)[/dim]")
+            continue
+        mgr = managers_by_name[mgr_name]
+        other = json.loads(pkg_file.read_text())
+        diff = mgr.diff(other)
+        if diff["extra"]:
+            console.print(f"\n[yellow]{mgr_name}[/yellow] — {len(diff['extra'])} extra package(s):")
+            for pkg in diff["extra"]:
+                console.print(f"  [red]·[/red] {pkg}")
+            if click.confirm(f"Uninstall {len(diff['extra'])} {mgr_name} package(s)?"):
+                mgr.uninstall(diff["extra"])
+        else:
+            console.print(f"[green]{mgr_name}:[/green] nothing to prune")
+
+
 @packages_cmd.command("install")
 @click.option("--from", "from_machine", default=None, metavar="MACHINE",
               help="Install packages from this machine's export (defaults to local machine).")

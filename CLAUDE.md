@@ -11,7 +11,7 @@ lintwin/
   cli/          main.py, init.py, sync.py, status.py, pull.py, diff.py, track.py, packages.py, selector.py, format.py
   core/         git.py, rsync.py, scanner.py, snapshot.py, config.py, constants.py, sizeguard.py
   core/packages/  base.py (ABC), arch.py (pacman/AUR/pip/npm)
-tests/          99 unit tests, all passing
+tests/          169 unit tests, all passing
 README.md       full user docs including Tailscale setup
 pyproject.toml  entry point: lintwin.cli.main:cli
 .venv/          virtualenv — use .venv/bin/python and .venv/bin/lintwin
@@ -31,8 +31,8 @@ pyproject.toml  entry point: lintwin.cli.main:cli
 - `~/.local/share/lintwin/last_sync.json` — rsync snapshot for conflict detection
 
 ## Implementation status
-All planned tasks complete. 161/161 tests passing.
-Commands: init, sync, status, pull, diff, track, untrack, packages (export/diff/install), remote (add/list/remove/edit)
+All planned tasks complete. 169/169 tests passing.
+Commands: init, sync, status, pull, diff, track, untrack, packages (export/diff/install/prune), remote (add/list/remove/edit)
 `lintwin init` uses an interactive arrow-key selector (`cli/selector.py`, built on `rich.Live`
 + `readchar`) to assign home-directory items to git/rsync/skip with live size totals.
 Before each `lintwin sync`, `core/sizeguard.py` scans git-tracked paths for oversized new

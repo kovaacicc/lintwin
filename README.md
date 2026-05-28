@@ -184,9 +184,12 @@ lintwin packages export             # snapshot installed packages (pacman, AUR, 
 lintwin packages diff --to desktop  # show what's missing between this machine and desktop
 lintwin packages install            # install packages missing from your own exported snapshot
 lintwin packages install --from desktop  # install packages that desktop has but you don't
+lintwin packages prune --from desktop   # uninstall packages you have that desktop doesn't (asks first)
 ```
 
 Package lists are written to `~/.config/lintwin/packages/<machine-name>/` — inside `~/.config` which is git-tracked, so they're committed and synced automatically via `lintwin sync`. Run `lintwin packages export` on each machine, then `lintwin sync` to share. `packages diff` reads from your local git copy, so the remote machine can be offline.
+
+**pip note:** `packages export` captures pip packages by name (versions are ignored for comparison). `packages install` uses `pip install --break-system-packages` to bypass the Arch PEP 668 restriction. `packages prune` uses `pip uninstall -y --break-system-packages`.
 
 ## CLI reference
 
@@ -216,6 +219,7 @@ lintwin packages export                     snapshot installed packages
 lintwin packages diff --to <remote>         show packages missing between machines (offline-safe)
 lintwin packages install                    install packages missing from your own snapshot
 lintwin packages install --from <machine>   install packages from another machine's snapshot
+lintwin packages prune --from <machine>     uninstall packages not in another machine's snapshot (confirms first)
 
 lintwin remote list                         show all configured remotes
 lintwin remote add <name> --host <ip> --ssh-user <user>   add a remote machine

@@ -16,6 +16,10 @@ class PackageManager(ABC):
     def install(self, packages: list[str]) -> None:
         ...
 
+    @abstractmethod
+    def uninstall(self, packages: list[str]) -> None:
+        ...
+
     @classmethod
     @abstractmethod
     def is_available(cls) -> bool:

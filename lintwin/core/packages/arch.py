@@ -1,3 +1,4 @@
+import json
 import subprocess
 from .base import PackageManager
 
@@ -36,6 +37,10 @@ class PacmanManager(PackageManager):
         if packages:
             subprocess.run(["sudo", "pacman", "-S", "--needed", *packages], check=True)
 
+    def uninstall(self, packages: list[str]) -> None:
+        if packages:
+            subprocess.run(["sudo", "pacman", "-R", "--noconfirm", *packages], check=True)
+
 
 class AurManager(PackageManager):
     @classmethod
@@ -62,6 +67,13 @@ class AurManager(PackageManager):
         if packages:
             subprocess.run([helper, "-S", "--needed", *packages], check=True)
 
+    def uninstall(self, packages: list[str]) -> None:
+        helper = _detect_aur_helper()
+        if not helper:
+            raise RuntimeError("No AUR helper found (yay or paru)")
+        if packages:
+            subprocess.run([helper, "-R", "--noconfirm", *packages], check=True)
+
 
 class PipManager(PackageManager):
     @classmethod
@@ -73,8 +85,8 @@ class PipManager(PackageManager):
         return _which("pip")
 
     def export(self) -> dict[str, list[str]]:
-        result = subprocess.run(["pip", "list", "--format=freeze"], capture_output=True, text=True, check=True)
-        return {"packages": result.stdout.strip().splitlines()}
+        result = subprocess.run(["pip", "list", "--format=json"], capture_output=True, text=True, check=True)
+        return {"packages": [item["name"] for item in json.loads(result.stdout)]}
 
     def diff(self, other: dict[str, list[str]]) -> dict[str, list[str]]:
         current = set(self.export().get("packages", []))
@@ -83,7 +95,11 @@ class PipManager(PackageManager):
 
     def install(self, packages: list[str]) -> None:
         if packages:
-            subprocess.run(["pip", "install", *packages], check=True)
+            subprocess.run(["pip", "install", "--break-system-packages", *packages], check=True)
+
+    def uninstall(self, packages: list[str]) -> None:
+        if packages:
+            subprocess.run(["pip", "uninstall", "-y", "--break-system-packages", *packages], check=True)
 
 
 class NpmManager(PackageManager):
@@ -97,7 +113,13 @@ class NpmManager(PackageManager):
 
     def export(self) -> dict[str, list[str]]:
         result = subprocess.run(["npm", "list", "-g", "--depth=0", "--parseable"], capture_output=True, text=True, check=True)
-        packages = [line.strip().split("/")[-1] for line in result.stdout.strip().splitlines() if line.strip()]
+        packages = []
+        for line in result.stdout.strip().splitlines()[1:]:  # first line is the root dir
+            parts = line.strip().split("/")
+            if len(parts) >= 2 and parts[-2].startswith("@"):
+                packages.append(f"{parts[-2]}/{parts[-1]}")
+            elif parts[-1]:
+                packages.append(parts[-1])
         return {"packages": packages}
 
     def diff(self, other: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -108,6 +130,10 @@ class NpmManager(PackageManager):
     def install(self, packages: list[str]) -> None:
         if packages:
             subprocess.run(["npm", "install", "-g", *packages], check=True)
+
+    def uninstall(self, packages: list[str]) -> None:
+        if packages:
+            subprocess.run(["npm", "uninstall", "-g", *packages], check=True)
 
 
 def get_available_managers() -> list[PackageManager]:
