@@ -269,6 +269,10 @@ def test_do_git_sync_applies_per_machine_excludes() -> None:
 
 def test_do_rsync_sync_applies_per_machine_excludes() -> None:
     from lintwin.cli.sync import _do_rsync_sync
+    local = LocalConfig(
+        machine_name="laptop",
+        remotes={"desktop": RemoteConfig(host="10.0.0.1", ssh_user="karlo")},
+    )
     shared = SharedConfig(
         git_paths=[],
         rsync_paths=["~/Downloads"],
@@ -279,5 +283,5 @@ def test_do_rsync_sync_applies_per_machine_excludes() -> None:
         mock_bef = _setup_do_rsync(stack, resolution=None, conflicts=[])
         stack.enter_context(patch("lintwin.cli.sync.rsync_path", return_value=MagicMock(returncode=0, stderr="")))
         stack.enter_context(patch("lintwin.cli.sync.rsync_file"))
-        _do_rsync_sync(shared, MOCK_LOCAL, "desktop", _REMOTE, set())
+        _do_rsync_sync(shared, local, "desktop", _REMOTE, set())
     assert "~/.config/kwinrc" in mock_bef.call_args[0][0]
