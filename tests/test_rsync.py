@@ -4,7 +4,7 @@ from lintwin.core.config import RemoteConfig
 from lintwin.core.snapshot import Snapshot, RemoteSnapshot, FileEntry
 from lintwin.core.rsync import (
     check_connectivity, detect_conflicts, build_excludes_file, _is_binary, Conflict,
-    rsync_path, rsync_file, fetch_remote_snapshot, Resolution,
+    rsync_path, rsync_file, fetch_remote_snapshot, fetch_remote_file_to_temp, Resolution,
 )
 
 
@@ -203,3 +203,44 @@ def test_rsync_file_respects_ssh_port() -> None:
     cmd = mock_run.call_args[0][0]
     assert "-e" in cmd
     assert "2222" in cmd[cmd.index("-e") + 1]
+
+
+def test_fetch_remote_file_to_temp_uses_tailscale_hostname() -> None:
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        result = fetch_remote_file_to_temp("~/doc.txt", REMOTE)
+    assert result is not None
+    cmd = mock_run.call_args[0][0]
+    assert "desktop" in " ".join(cmd)
+    assert "10.0.0.1" not in " ".join(cmd)
+    if result:
+        result.unlink(missing_ok=True)
+
+
+def test_fetch_remote_file_to_temp_respects_ssh_port() -> None:
+    remote_with_port = RemoteConfig(host="10.0.0.1", ssh_user="karlo", ssh_port=2222)
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        result = fetch_remote_file_to_temp("~/doc.txt", remote_with_port)
+    assert result is not None
+    cmd = mock_run.call_args[0][0]
+    assert any("2222" in arg for arg in cmd)
+    if result:
+        result.unlink(missing_ok=True)
+
+
+def test_fetch_remote_file_to_temp_returns_none_on_failure() -> None:
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stderr="connection refused")
+        result = fetch_remote_file_to_temp("~/doc.txt", REMOTE)
+    assert result is None
+
+
+def test_fetch_remote_file_to_temp_returns_path_on_success() -> None:
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        result = fetch_remote_file_to_temp("~/doc.txt", REMOTE)
+    assert result is not None
+    assert isinstance(result, Path)
+    if result:
+        result.unlink(missing_ok=True)

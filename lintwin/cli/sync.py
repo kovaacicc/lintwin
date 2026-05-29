@@ -7,7 +7,8 @@ from lintwin.core.config import (
     load_local_config, load_shared_config, save_shared_config,
 )
 from lintwin.core.scanner import scan_for_dirty_repos, DirtyRepo
-from lintwin.core.rsync import check_connectivity, fetch_remote_snapshot, detect_conflicts, build_excludes_file, rsync_path, rsync_file, Resolution, Conflict
+import subprocess
+from lintwin.core.rsync import check_connectivity, fetch_remote_snapshot, detect_conflicts, build_excludes_file, rsync_path, rsync_file, fetch_remote_file_to_temp, Resolution, Conflict
 from lintwin.core.snapshot import load_snapshot, now_iso, update_snapshot, Snapshot
 from lintwin.core import git as git_core
 from lintwin.core.constants import BARE_REPO, SNAPSHOT_FILE
@@ -269,8 +270,12 @@ def _resolve_conflict(conflict: Conflict, remote: RemoteConfig, remote_name: str
         choices += "  [4] Show diff"
     choice = click.prompt(f"  {choices}", default="3")
     if choice == "4" and not conflict.is_binary:
-        import subprocess as _sp
-        _sp.run(["diff", "--color", conflict.path, f"{remote.ssh_user}@{remote.host}:{conflict.path}"])
+        tmp = fetch_remote_file_to_temp(conflict.path, remote)
+        if tmp:
+            subprocess.run(["diff", "--color", conflict.path, str(tmp)])
+            tmp.unlink(missing_ok=True)
+        else:
+            console.print("[red]  Could not fetch remote file for diff.[/red]")
         choice = click.prompt("  [1] Keep local  [2] Keep remote  [3] Skip", default="3")
     return {"1": Resolution.KEEP_LOCAL, "2": Resolution.KEEP_REMOTE, "3": Resolution.SKIP}.get(choice, Resolution.SKIP)
 

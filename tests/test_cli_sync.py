@@ -136,10 +136,42 @@ def test_resolve_conflict_skip_returns_skip() -> None:
 
 def test_resolve_conflict_show_diff_then_keep_local() -> None:
     from lintwin.cli.sync import _resolve_conflict
+    import tempfile
+    tmp = Path(tempfile.mktemp(suffix=".txt"))
+    tmp.write_text("remote content")
     with patch("lintwin.cli.sync.click.prompt", side_effect=["4", "1"]):
-        with patch("subprocess.run"):
-            result = _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+        with patch("lintwin.cli.sync.fetch_remote_file_to_temp", return_value=tmp):
+            with patch("lintwin.cli.sync.subprocess.run"):
+                result = _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+    tmp.unlink(missing_ok=True)
     assert result == Resolution.KEEP_LOCAL
+
+
+def test_resolve_conflict_show_diff_diffs_against_temp_file() -> None:
+    from lintwin.cli.sync import _resolve_conflict
+    import tempfile
+    tmp = Path(tempfile.mktemp(suffix=".txt"))
+    tmp.write_text("remote content")
+    with patch("lintwin.cli.sync.click.prompt", side_effect=["4", "3"]):
+        with patch("lintwin.cli.sync.fetch_remote_file_to_temp", return_value=tmp):
+            with patch("lintwin.cli.sync.subprocess.run") as mock_diff:
+                _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+    tmp.unlink(missing_ok=True)
+    diff_cmd = mock_diff.call_args[0][0]
+    assert diff_cmd[0] == "diff"
+    assert str(tmp) in diff_cmd
+    assert f"{_REMOTE.ssh_user}@{_REMOTE.host}:" not in " ".join(diff_cmd)
+
+
+def test_resolve_conflict_show_diff_handles_fetch_failure() -> None:
+    from lintwin.cli.sync import _resolve_conflict
+    diff_calls = []
+    with patch("lintwin.cli.sync.click.prompt", side_effect=["4", "3"]):
+        with patch("lintwin.cli.sync.fetch_remote_file_to_temp", return_value=None):
+            with patch("lintwin.cli.sync.subprocess.run", side_effect=lambda *a, **kw: diff_calls.append(a)):
+                result = _resolve_conflict(_CONFLICT, _REMOTE, "desktop")
+    assert result == Resolution.SKIP
+    assert diff_calls == []
 
 
 def test_freshness_check_silent_when_remote_snap_is_none() -> None:

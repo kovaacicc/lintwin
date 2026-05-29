@@ -173,6 +173,22 @@ def rsync_path(
     return subprocess.run(cmd, capture_output=True, text=True)
 
 
+def fetch_remote_file_to_temp(path: str, remote: RemoteConfig) -> Path | None:
+    host = remote.tailscale_hostname or remote.host
+    remote_file = f"{remote.ssh_user}@{host}:{_to_remote_path(path)}"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(path).expanduser().suffix) as f:
+        tmp = Path(f.name)
+    cmd = ["rsync", "-avz"]
+    if remote.ssh_port:
+        cmd += ["-e", f"ssh -p {remote.ssh_port}"]
+    cmd.extend([remote_file, str(tmp)])
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        return None
+    return tmp
+
+
 def rsync_file(
     local_path: str,
     remote: RemoteConfig,
