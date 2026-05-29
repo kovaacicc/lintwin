@@ -246,3 +246,38 @@ def test_do_rsync_sync_no_conflicts_standard_push() -> None:
     mock_rp.assert_called_once()
     assert mock_rp.call_args.kwargs.get("direction", "push") == "push"
     mock_rf.assert_not_called()
+
+
+def test_do_git_sync_applies_per_machine_excludes() -> None:
+    from lintwin.cli.sync import _do_git_sync
+    shared = SharedConfig(
+        git_paths=["~/.bashrc"],
+        rsync_paths=[],
+        never_sync=["~/.ssh"],
+        git_excludes=["~/.config/foo"],
+        per_machine={"laptop": ["~/.config/kwinrc"]},
+    )
+    with ExitStack() as stack:
+        stack.enter_context(patch("lintwin.cli.sync.git_core.fetch"))
+        stack.enter_context(patch("lintwin.cli.sync.git_core.divergence_info", return_value=(1, 0)))
+        mock_sp = stack.enter_context(patch("lintwin.cli.sync.git_core.stage_paths"))
+        stack.enter_context(patch("lintwin.cli.sync.git_core.commit"))
+        stack.enter_context(patch("lintwin.cli.sync.git_core.push"))
+        _do_git_sync(shared, "laptop", "desktop")
+    assert "~/.config/kwinrc" in mock_sp.call_args.kwargs["excludes"]
+
+
+def test_do_rsync_sync_applies_per_machine_excludes() -> None:
+    from lintwin.cli.sync import _do_rsync_sync
+    shared = SharedConfig(
+        git_paths=[],
+        rsync_paths=["~/Downloads"],
+        never_sync=["~/.ssh"],
+        per_machine={"laptop": ["~/.config/kwinrc"]},
+    )
+    with ExitStack() as stack:
+        mock_bef = _setup_do_rsync(stack, resolution=None, conflicts=[])
+        stack.enter_context(patch("lintwin.cli.sync.rsync_path", return_value=MagicMock(returncode=0, stderr="")))
+        stack.enter_context(patch("lintwin.cli.sync.rsync_file"))
+        _do_rsync_sync(shared, MOCK_LOCAL, "desktop", _REMOTE, set())
+    assert "~/.config/kwinrc" in mock_bef.call_args[0][0]

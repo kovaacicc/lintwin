@@ -166,7 +166,7 @@ def _do_git_sync(shared: SharedConfig, machine_name: str, remote_name: str) -> N
     elif ahead > 0 and behind == 0:
         git_core.stage_paths(
             shared.git_paths, BARE_REPO,
-            excludes=shared.never_sync + shared.git_excludes,
+            excludes=shared.never_sync + shared.git_excludes + shared.per_machine.get(machine_name, []),
         )
         msg = f"lintwin: sync from {machine_name} @ {now_iso()}"
         git_core.commit(msg, BARE_REPO)
@@ -215,11 +215,12 @@ def _do_rsync_sync(
     excluded_from_push = {p for p, r in resolutions.items() if r in (Resolution.KEEP_REMOTE, Resolution.SKIP)}
     keep_remote_paths = [p for p, r in resolutions.items() if r == Resolution.KEEP_REMOTE]
 
+    machine_excludes = shared.per_machine.get(local.machine_name, [])
     for path in shared.rsync_paths:
         if any(path.startswith(skip) or str(path) == skip for skip in skip_paths):
             console.print(f"  [dim]Skipping {path} (dirty repo)[/dim]")
             continue
-        excludes = build_excludes_file(shared.never_sync + list(excluded_from_push), path)
+        excludes = build_excludes_file(shared.never_sync + list(excluded_from_push) + machine_excludes, path)
         result = rsync_path(path, remote, direction="push", excludes_file=excludes)
         if result.returncode == 0:
             console.print(f"  [green]✓[/green] {path}")
