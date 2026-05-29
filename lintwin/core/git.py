@@ -75,6 +75,10 @@ def list_tracked_files(bare_repo: Path = BARE_REPO, work_tree: Path | None = Non
     return {str(work_tree / line) for line in result.stdout.splitlines() if line}
 
 
+def git_rm_cached(path: str, bare_repo: Path = BARE_REPO, work_tree: Path | None = None) -> None:
+    _git("rm", "--cached", "--", path, bare_repo=bare_repo, work_tree=work_tree, check=False)
+
+
 def stage_paths(
     paths: list[str],
     bare_repo: Path = BARE_REPO,

@@ -4,6 +4,7 @@ from pathlib import Path
 from rich.console import Console
 from lintwin.core.config import track_path, untrack_path, load_shared_config
 from lintwin.core.constants import SHARED_CONFIG_PATH
+from lintwin.core import git as git_core
 
 console = Console()
 err_console = Console(stderr=True)
@@ -44,8 +45,13 @@ def track_cmd(path: str, via: str) -> None:
 @click.argument("path")
 def untrack_cmd(path: str) -> None:
     """Remove PATH from the sync list."""
-    removed = untrack_path(path, SHARED_CONFIG_PATH)
-    if not removed:
+    via = untrack_path(path, SHARED_CONFIG_PATH)
+    if not via:
         err_console.print(f"[red]Error:[/red] {path} is not tracked")
         raise SystemExit(1)
     console.print(f"[green]Removed[/green] {path} from sync list")
+    if via == "git" and git_core.is_initialized():
+        git_core.git_rm_cached(path)
+        git_core.commit(f"lintwin: untrack {path}")
+        if click.confirm("Push now?", default=False):
+            git_core.push()

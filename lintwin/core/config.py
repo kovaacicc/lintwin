@@ -105,14 +105,14 @@ def track_path(path_str: str, via: str, shared_path: Path = SHARED_CONFIG_PATH) 
         save_shared_config(config, shared_path)
 
 
-def untrack_path(path_str: str, shared_path: Path = SHARED_CONFIG_PATH) -> bool:
+def untrack_path(path_str: str, shared_path: Path = SHARED_CONFIG_PATH) -> str | None:
     config = load_shared_config(shared_path)
-    for lst in (config.git_paths, config.rsync_paths):
+    for via, lst in (("git", config.git_paths), ("rsync", config.rsync_paths)):
         if path_str in lst:
             lst.remove(path_str)
             save_shared_config(config, shared_path)
-            return True
-    return False
+            return via
+    return None
 
 
 def add_machine_exclude(machine_name: str, path_str: str, shared_path: Path = SHARED_CONFIG_PATH) -> None:

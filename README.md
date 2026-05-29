@@ -172,8 +172,10 @@ lintwin pull --to laptop
 ```bash
 lintwin track ~/.config/nvim --via git      # track with git (must be inside $HOME)
 lintwin track ~/Documents --via rsync        # track with rsync
-lintwin untrack ~/.config/nvim               # stop tracking
+lintwin untrack ~/.config/nvim               # stop tracking (git paths: also runs git rm --cached + commits)
 ```
+
+For git-tracked paths, `untrack` also stages a removal (`git rm --cached`) and auto-commits so other machines stop receiving the file on next `pull`. Git history is **not** rewritten — if the file contained secrets, use `git filter-repo` to purge the history manually after untracking.
 
 Paths matching any `[never_sync]` pattern (e.g. `~/.ssh/id_*`, `*.gpg`, `~/.config/lintwin/config.toml`) are rejected by `track` with an error. To override, remove the pattern from the `[never_sync]` section in `shared.toml` first.
 
@@ -227,7 +229,7 @@ lintwin diff --to <remote>
 
 lintwin track <path> --via git              add to git-tracked paths
 lintwin track <path> --via rsync            add to rsync paths
-lintwin untrack <path>                      remove from sync
+lintwin untrack <path>                      remove from sync (git paths: also removes from git index + commits)
 
 lintwin exclude add <path>                  skip path on sync for this machine only
 lintwin exclude remove <path>               remove per-machine exclusion

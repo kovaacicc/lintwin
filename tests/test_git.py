@@ -5,6 +5,7 @@ from lintwin.core.git import (
     init_bare_repo, _git, set_remote,
     divergence_info, stage_paths, commit,
     status_short, log_oneline, list_tracked_files,
+    git_rm_cached,
 )
 
 
@@ -191,3 +192,18 @@ def test_stage_paths_gpg_files_not_committed_with_default_never_sync(bare_repo) 
     tracked = list_tracked_files(bare_repo=repo, work_tree=work)
     assert str(dot_local / "data.json") in tracked
     assert str(dot_local / "keyring.gpg") not in tracked
+
+
+def test_git_rm_cached_removes_file_from_index(bare_repo) -> None:
+    repo, work = bare_repo
+    git_rm_cached("hello.txt", bare_repo=repo, work_tree=work)
+    result = subprocess.run(
+        ["git", f"--git-dir={repo}", f"--work-tree={work}", "ls-files", "hello.txt"],
+        capture_output=True, text=True,
+    )
+    assert result.stdout.strip() == ""
+
+
+def test_git_rm_cached_noop_for_untracked_file(bare_repo) -> None:
+    repo, work = bare_repo
+    git_rm_cached("nonexistent.txt", bare_repo=repo, work_tree=work)  # must not raise

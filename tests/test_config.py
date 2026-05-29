@@ -89,7 +89,7 @@ def test_untrack_path_found(tmp_path: Path) -> None:
     cfg_path = tmp_path / "shared.toml"
     _write_shared(cfg_path, ["~/.bashrc"], ["~/Downloads"], [])
     result = untrack_path("~/.bashrc", cfg_path)
-    assert result is True
+    assert result == "git"
     cfg = load_shared_config(cfg_path)
     assert "~/.bashrc" not in cfg.git_paths
 
@@ -98,7 +98,25 @@ def test_untrack_path_not_found(tmp_path: Path) -> None:
     cfg_path = tmp_path / "shared.toml"
     _write_shared(cfg_path, [], [], [])
     result = untrack_path("~/.vimrc", cfg_path)
-    assert result is False
+    assert result is None
+
+
+def test_untrack_path_returns_git(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "shared.toml"
+    _write_shared(cfg_path, ["~/.bashrc"], ["~/Downloads"], [])
+    assert untrack_path("~/.bashrc", cfg_path) == "git"
+
+
+def test_untrack_path_returns_rsync(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "shared.toml"
+    _write_shared(cfg_path, ["~/.bashrc"], ["~/Downloads"], [])
+    assert untrack_path("~/Downloads", cfg_path) == "rsync"
+
+
+def test_untrack_path_returns_none_when_missing(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "shared.toml"
+    _write_shared(cfg_path, ["~/.bashrc"], ["~/Downloads"], [])
+    assert untrack_path("~/nottracked", cfg_path) is None
 
 
 def test_shared_config_roundtrips_size_guard_fields(tmp_path: Path) -> None:

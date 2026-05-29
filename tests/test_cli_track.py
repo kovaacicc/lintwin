@@ -54,6 +54,7 @@ def test_untrack_existing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     _write_shared(shared)
     monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
     monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.core.git.is_initialized", lambda: False)
 
     runner = CliRunner()
     result = runner.invoke(cli, ["untrack", "~/.bashrc"])
@@ -118,3 +119,108 @@ def test_track_allowed_when_not_in_never_sync(tmp_path: Path, monkeypatch: pytes
     runner = CliRunner()
     result = runner.invoke(cli, ["track", "~/.config/nvim", "--via", "git"])
     assert result.exit_code == 0
+
+
+def _patch_git(monkeypatch, calls, initialized=True):
+    monkeypatch.setattr("lintwin.core.git.is_initialized", lambda: initialized)
+    monkeypatch.setattr("lintwin.core.git.git_rm_cached", lambda path, **kw: calls.append(("rm", path)), raising=False)
+    monkeypatch.setattr("lintwin.core.git.commit", lambda msg, **kw: calls.append(("commit", msg)))
+    monkeypatch.setattr("lintwin.core.git.push", lambda **kw: calls.append(("push",)))
+
+
+def test_untrack_git_calls_git_rm_cached(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shared = tmp_path / "shared.toml"
+    _write_shared(shared)
+    monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    calls: list = []
+    _patch_git(monkeypatch, calls)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["untrack", "~/.bashrc"], input="n\n")
+    assert result.exit_code == 0
+    assert any(op == "rm" and "bashrc" in path for op, path in calls)
+
+
+def test_untrack_git_commits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shared = tmp_path / "shared.toml"
+    _write_shared(shared)
+    monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    calls: list = []
+    _patch_git(monkeypatch, calls)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["untrack", "~/.bashrc"], input="n\n")
+    assert result.exit_code == 0
+    assert any(op == "commit" and "bashrc" in msg for op, msg in calls)
+
+
+def test_untrack_git_prompts_push(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shared = tmp_path / "shared.toml"
+    _write_shared(shared)
+    monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    calls: list = []
+    _patch_git(monkeypatch, calls)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["untrack", "~/.bashrc"], input="n\n")
+    assert result.exit_code == 0
+    assert "push" in result.output.lower()
+
+
+def test_untrack_git_pushes_on_yes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shared = tmp_path / "shared.toml"
+    _write_shared(shared)
+    monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    calls: list = []
+    _patch_git(monkeypatch, calls)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["untrack", "~/.bashrc"], input="y\n")
+    assert result.exit_code == 0
+    assert ("push",) in calls
+
+
+def test_untrack_git_no_push_on_no(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shared = tmp_path / "shared.toml"
+    _write_shared(shared)
+    monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    calls: list = []
+    _patch_git(monkeypatch, calls)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["untrack", "~/.bashrc"], input="n\n")
+    assert result.exit_code == 0
+    assert ("push",) not in calls
+
+
+def test_untrack_rsync_no_git_ops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shared = tmp_path / "shared.toml"
+    _write_shared(shared)
+    monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    calls: list = []
+    _patch_git(monkeypatch, calls)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["untrack", "~/Downloads"])
+    assert result.exit_code == 0
+    assert calls == []
+
+
+def test_untrack_not_initialized_no_git_ops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shared = tmp_path / "shared.toml"
+    _write_shared(shared)
+    monkeypatch.setattr("lintwin.core.config.SHARED_CONFIG_PATH", shared)
+    monkeypatch.setattr("lintwin.cli.track.SHARED_CONFIG_PATH", shared)
+    calls: list = []
+    _patch_git(monkeypatch, calls, initialized=False)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["untrack", "~/.bashrc"])
+    assert result.exit_code == 0
+    assert calls == []
