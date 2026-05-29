@@ -8,6 +8,7 @@ from lintwin.cli.pull import pull_cmd
 from lintwin.cli.diff import diff_cmd
 from lintwin.cli.packages import packages_cmd
 from lintwin.cli.remote import remote_cmd
+from lintwin.cli.exclude import exclude_cmd
 
 console = Console()
 
@@ -27,6 +28,7 @@ cli.add_command(pull_cmd)
 cli.add_command(diff_cmd)
 cli.add_command(packages_cmd)
 cli.add_command(remote_cmd)
+cli.add_command(exclude_cmd)
 
 
 if __name__ == "__main__":
