@@ -1,4 +1,3 @@
-import pytest
 from click.testing import CliRunner
 from lintwin.cli.main import cli
 from lintwin.core.config import load_shared_config
@@ -62,6 +61,7 @@ def test_exclude_remove_not_found(tmp_path, monkeypatch):
     runner = CliRunner()
     result = runner.invoke(cli, ["exclude", "remove", "~/.config/kwinrc"])
     assert result.exit_code != 0
+    assert "not in the exclude list" in result.output
 
 
 def test_exclude_list(tmp_path, monkeypatch):
@@ -88,10 +88,15 @@ def test_exclude_list_empty(tmp_path, monkeypatch):
 
 
 def test_exclude_not_initialized(tmp_path, monkeypatch):
-    missing = tmp_path / "config.toml"  # does not exist
+    missing = tmp_path / "config.toml"
     shared = _write_shared_config(tmp_path)
     monkeypatch.setattr("lintwin.cli.exclude.LOCAL_CONFIG_PATH", missing)
     monkeypatch.setattr("lintwin.cli.exclude.SHARED_CONFIG_PATH", shared)
     runner = CliRunner()
-    result = runner.invoke(cli, ["exclude", "add", "~/.config/kwinrc"])
-    assert result.exit_code != 0
+    for args in (
+        ["exclude", "add", "~/.config/kwinrc"],
+        ["exclude", "remove", "~/.config/kwinrc"],
+        ["exclude", "list"],
+    ):
+        result = runner.invoke(cli, args)
+        assert result.exit_code != 0
