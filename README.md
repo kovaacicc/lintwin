@@ -177,6 +177,20 @@ lintwin untrack ~/.config/nvim               # stop tracking
 
 Paths matching any `[never_sync]` pattern (e.g. `~/.ssh/id_*`, `*.gpg`, `~/.config/lintwin/config.toml`) are rejected by `track` with an error. To override, remove the pattern from the `[never_sync]` section in `shared.toml` first.
 
+## Per-machine excludes
+
+Some configs are hardware-bound — monitor layouts, GPU settings, display scaling. You may want to track them with git on all machines but skip syncing them on a specific machine so the local version isn't overwritten.
+
+```bash
+lintwin exclude add ~/.config/kwinrc       # skip this path on sync for this machine only
+lintwin exclude remove ~/.config/kwinrc    # remove the exclusion
+lintwin exclude list                       # show this machine's excludes
+```
+
+Excludes are stored in `shared.toml` under `[per_machine.<machine_name>]` and committed, so all machines know which paths each machine skips. Each machine only applies its own excludes — the path is still tracked and synced on every other machine normally.
+
+This is different from `never_sync`: `never_sync` blocks a path globally on all machines; per-machine excludes block a path only on the machine that added it.
+
 ## Package management
 
 ```bash
@@ -214,6 +228,10 @@ lintwin diff --to <remote>
 lintwin track <path> --via git              add to git-tracked paths
 lintwin track <path> --via rsync            add to rsync paths
 lintwin untrack <path>                      remove from sync
+
+lintwin exclude add <path>                  skip path on sync for this machine only
+lintwin exclude remove <path>               remove per-machine exclusion
+lintwin exclude list                        show this machine's per-machine excludes
 
 lintwin packages export                     snapshot installed packages
 lintwin packages diff --to <remote>         show packages missing between machines (offline-safe)
@@ -280,6 +298,12 @@ patterns = [
   "*.gpg",
   "~/.gnupg",
 ]
+
+[per_machine.laptop]
+excludes = ["~/.config/kwinrc", "~/.config/monitors.xml"]
+
+[per_machine.desktop]
+excludes = ["~/.config/monitors.xml"]
 ```
 
 ## What gets synced
