@@ -21,20 +21,24 @@ def test_check_connectivity_uses_tailscale_first() -> None:
     assert "tailscale" in first_call_cmd
 
 
-def test_check_connectivity_fallback_to_ping() -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
+def test_check_connectivity_fallback_uses_tcp_connect() -> None:
+    with patch("socket.create_connection") as mock_connect:
         result = check_connectivity(REMOTE_NO_TS)
     assert result is True
-    first_call_cmd = mock_run.call_args_list[0][0][0]
-    assert "ping" in first_call_cmd
+    mock_connect.assert_called_once_with(("10.0.0.1", 22), timeout=3)
 
 
-def test_check_connectivity_returns_false_on_failure() -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1)
+def test_check_connectivity_tcp_unreachable_returns_false() -> None:
+    with patch("socket.create_connection", side_effect=OSError):
         result = check_connectivity(REMOTE_NO_TS)
     assert result is False
+
+
+def test_check_connectivity_uses_configured_ssh_port() -> None:
+    remote_with_port = RemoteConfig(host="10.0.0.1", ssh_user="karlo", ssh_port=2222)
+    with patch("socket.create_connection") as mock_connect:
+        check_connectivity(remote_with_port)
+    mock_connect.assert_called_once_with(("10.0.0.1", 2222), timeout=3)
 
 
 def _make_snapshot(machine: str, remote_name: str, sync_ts: str, files: dict) -> Snapshot:

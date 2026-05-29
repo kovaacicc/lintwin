@@ -1,4 +1,5 @@
 import json
+import socket
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -31,11 +32,12 @@ def check_connectivity(remote: RemoteConfig) -> bool:
         )
         if result.returncode == 0:
             return True
-    result = subprocess.run(
-        ["ping", "-c", "1", "-W", "2", remote.host],
-        capture_output=True,
-    )
-    return result.returncode == 0
+    port = remote.ssh_port or 22
+    try:
+        with socket.create_connection((remote.host, port), timeout=3):
+            return True
+    except OSError:
+        return False
 
 
 def fetch_remote_snapshot(remote: RemoteConfig, remote_path: Path = SNAPSHOT_FILE) -> Snapshot | None:
