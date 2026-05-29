@@ -48,6 +48,63 @@ def test_divergence_in_sync(bare_repo) -> None:
     assert behind == 0
 
 
+def test_divergence_before_first_push(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    work = tmp_path / "work"
+    work.mkdir()
+    init_bare_repo(repo)
+    origin = tmp_path / "origin"
+    subprocess.run(["git", "init", "--bare", "-b", "main", str(origin)], check=True, capture_output=True)
+    set_remote(f"file://{origin}", bare_repo=repo)
+    (work / "hello.txt").write_text("hello")
+    subprocess.run(["git", f"--git-dir={repo}", f"--work-tree={work}", "add", str(work / "hello.txt")], check=True)
+    subprocess.run(
+        ["git", f"--git-dir={repo}", f"--work-tree={work}", "-c", "user.email=test@test.com",
+         "-c", "user.name=Test", "commit", "-m", "init"],
+        check=True,
+    )
+    # origin/main does not exist yet — never pushed
+    ahead, behind = divergence_info(bare_repo=repo, branch="main")
+    assert ahead == 1
+    assert behind == 0
+
+
+def test_divergence_ahead(bare_repo) -> None:
+    repo, work = bare_repo
+    (work / "extra.txt").write_text("extra")
+    stage_paths([str(work / "extra.txt")], bare_repo=repo, work_tree=work)
+    commit("extra commit", bare_repo=repo, work_tree=work)
+    ahead, behind = divergence_info(bare_repo=repo, branch="main")
+    assert ahead == 1
+    assert behind == 0
+
+
+def test_divergence_behind(bare_repo, tmp_path: Path) -> None:
+    repo, work = bare_repo
+    # figure out origin URL from the bare repo's remote config
+    result = subprocess.run(
+        ["git", f"--git-dir={repo}", "remote", "get-url", "origin"],
+        capture_output=True, text=True, check=True,
+    )
+    origin_url = result.stdout.strip()
+    # push a new commit from a separate clone so origin/main advances
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", origin_url, str(clone)], check=True, capture_output=True)
+    (clone / "extra.txt").write_text("extra")
+    subprocess.run(["git", "-C", str(clone), "add", "extra.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(clone), "-c", "user.email=test@test.com", "-c", "user.name=Test",
+         "commit", "-m", "remote extra"],
+        check=True, capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(clone), "push"], check=True, capture_output=True)
+    # fetch so local tracking ref advances
+    subprocess.run(["git", f"--git-dir={repo}", "fetch", "origin"], check=True, capture_output=True)
+    ahead, behind = divergence_info(bare_repo=repo, branch="main")
+    assert ahead == 0
+    assert behind == 1
+
+
 def test_commit_returns_false_nothing_to_commit(bare_repo) -> None:
     repo, work = bare_repo
     result = commit("test msg", bare_repo=repo, work_tree=work)

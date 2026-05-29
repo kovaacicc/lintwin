@@ -56,12 +56,15 @@ def is_initialized(bare_repo: Path = BARE_REPO) -> bool:
 
 
 def divergence_info(branch: str = "main", bare_repo: Path = BARE_REPO) -> tuple[int, int]:
-    result = _git("rev-list", "--left-right", "--count", f"HEAD...origin/{branch}", bare_repo=bare_repo, check=False)
-    if result.returncode != 0:
-        # origin/main doesn't exist yet (before first push) — count local commits as ahead
+    has_remote_ref = _git("rev-parse", "--verify", f"origin/{branch}", bare_repo=bare_repo, check=False).returncode == 0
+    if not has_remote_ref:
+        # origin/branch doesn't exist locally yet (before first push) — count local commits as ahead
         head = _git("rev-list", "--count", "HEAD", bare_repo=bare_repo, check=False)
         if head.returncode == 0:
             return int(head.stdout.strip()), 0
+        return 0, 0
+    result = _git("rev-list", "--left-right", "--count", f"HEAD...origin/{branch}", bare_repo=bare_repo, check=False)
+    if result.returncode != 0:
         return 0, 0
     parts = result.stdout.strip().split()
     return int(parts[0]), int(parts[1])
